@@ -1,7 +1,15 @@
 {
   "name": "Sungrow WINET-S Inverter",
-  "hacs": "1.6.0",
-  "domains": ["sensor"],
-  "iot_class": "Local Polling",
-  "homeassistant": "2024.1.0"
+  "version": "1.0.0",
+  "slug": "sungrow_winet_s",
+  "description": "A complete Home Assistant custom integration for Sungrow inverters using the WINET-S communication device.",
+  "url": "https://github.com/Qlimuli/sungrow-winet-hacs-homeassistant",
+  "authors": ["Qlimuli"],
+  "category": "integration",
+  "iot_class": "local_polling",
+  "codeowners": ["Qlimuli"],
+  "dependencies": [],
+  "documentation": "https://github.com/Qlimuli/sungrow-winet-hacs-homeassistant/blob/main/README.md",
+  "issue_tracker": "https://github.com/Qlimuli/sungrow-winet-hacs-homeassistant/issues",
+  "manifest": "https://raw.githubusercontent.com/Qlimuli/sungrow-winet-hacs-homeassistant/main/custom_components/sungrow_winet_s/manifest.json"
 }
