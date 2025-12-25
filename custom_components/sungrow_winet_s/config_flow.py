@@ -8,6 +8,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_PORT, CONF_USERNAME, CONF_PASSWORD
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.exceptions import HomeAssistantError
 import homeassistant.helpers.config_validation as cv
 
 from .api import SungrowModbusClient, SungrowHTTPClient, SungrowCloudClient
@@ -31,84 +32,56 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+class ConnectionError(HomeAssistantError):
+    """Custom error for connection failures."""
+
+
 async def validate_modbus_connection(
     hass: HomeAssistant, host: str, port: int, slave_id: int
 ) -> dict[str, Any]:
-    """Validate Modbus TCP connection to inverter.
-    
-    Args:
-        hass: Home Assistant instance
-        host: Inverter/WINET-S IP address
-        port: Modbus port
-        slave_id: Modbus slave ID
-        
-    Returns:
-        Dict with device info
-        
-    Raises:
-        Exception: If connection fails
-    """
+    """Validate Modbus TCP connection to inverter."""
     client = SungrowModbusClient(host, port, slave_id)
-    
-    if not await client.test_connection():
-        raise Exception("Cannot connect to inverter via Modbus TCP")
-    
-    await client.disconnect()
-    
-    return {"title": f"{DEFAULT_NAME} ({host})"}
+    try:
+        if not await client.test_connection():
+            raise ConnectionError("Cannot connect to inverter via Modbus TCP")
+        return {"title": f"{DEFAULT_NAME} ({host})"}
+    except Exception as err:
+        _LOGGER.error("Modbus connection failed: %s", err)
+        raise ConnectionError(str(err)) from err
+    finally:
+        await client.disconnect()
 
 
 async def validate_http_connection(
     hass: HomeAssistant, host: str, port: int
 ) -> dict[str, Any]:
-    """Validate HTTP connection to WINET-S.
-    
-    Args:
-        hass: Home Assistant instance
-        host: WINET-S IP address
-        port: HTTP port
-        
-    Returns:
-        Dict with device info
-        
-    Raises:
-        Exception: If connection fails
-    """
+    """Validate HTTP connection to WINET-S."""
     client = SungrowHTTPClient(host, port)
-    
-    if not await client.test_connection():
-        raise Exception("Cannot connect to WINET-S via HTTP")
-    
-    await client.close()
-    
-    return {"title": f"{DEFAULT_NAME} ({host})"}
+    try:
+        if not await client.test_connection():
+            raise ConnectionError("Cannot connect to WINET-S via HTTP")
+        return {"title": f"{DEFAULT_NAME} ({host})"}
+    except Exception as err:
+        _LOGGER.error("HTTP connection failed: %s", err)
+        raise ConnectionError(str(err)) from err
+    finally:
+        await client.close()
 
 
 async def validate_cloud_connection(
     hass: HomeAssistant, username: str, password: str, api_key: Optional[str]
 ) -> dict[str, Any]:
-    """Validate cloud API connection.
-    
-    Args:
-        hass: Home Assistant instance
-        username: iSolarCloud username
-        password: iSolarCloud password
-        api_key: API key (optional)
-        
-    Returns:
-        Dict with device info
-        
-    Raises:
-        Exception: If connection fails
-    """
+    """Validate cloud API connection."""
     client = SungrowCloudClient(username, password, api_key)
-    
-    if not await client.test_connection():
-        raise Exception("Cannot authenticate with iSolarCloud")
-    
-    await client.close()
-    
-    return {"title": f"{DEFAULT_NAME} (Cloud)"}
+    try:
+        if not await client.test_connection():
+            raise ConnectionError("Cannot authenticate with iSolarCloud")
+        return {"title": f"{DEFAULT_NAME} (Cloud)"}
+    except Exception as err:
+        _LOGGER.error("Cloud connection failed: %s", err)
+        raise ConnectionError(str(err)) from err
+    finally:
+        await client.close()
 
 
 class SungrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -127,12 +100,11 @@ class SungrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle the initial step - choose connection type."""
         if user_input is not None:
             self.connection_type = user_input[CONF_CONNECTION_TYPE]
-            
             if self.connection_type == CONNECTION_TYPE_MODBUS:
                 return await self.async_step_modbus()
-            elif self.connection_type == CONNECTION_TYPE_HTTP:
+            if self.connection_type == CONNECTION_TYPE_HTTP:
                 return await self.async_step_http()
-            elif self.connection_type == CONNECTION_TYPE_CLOUD:
+            if self.connection_type == CONNECTION_TYPE_CLOUD:
                 return await self.async_step_cloud()
 
         data_schema = vol.Schema(
@@ -151,122 +123,82 @@ class SungrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
         return self.async_show_form(
-            step_id="user",
-            data_schema=data_schema,
-            description_placeholders={
-                "name": DEFAULT_NAME,
-            },
+            step_id="user", data_schema=data_schema, description_placeholders={"name": DEFAULT_NAME}
         )
 
     async def async_step_modbus(
         self, user_input: Optional[dict[str, Any]] = None
     ) -> FlowResult:
         """Handle Modbus TCP configuration."""
-        errors = {}
-
+        errors: dict[str, str] = {}
         if user_input is not None:
             try:
                 info = await validate_modbus_connection(
-                    self.hass,
-                    user_input[CONF_HOST],
-                    user_input[CONF_PORT],
-                    user_input[CONF_MODBUS_SLAVE_ID],
+                    self.hass, user_input[CONF_HOST], user_input[CONF_PORT], user_input[CONF_MODBUS_SLAVE_ID]
                 )
-                
-                # Store configuration
                 self.data = {
                     CONF_CONNECTION_TYPE: CONNECTION_TYPE_MODBUS,
                     CONF_HOST: user_input[CONF_HOST],
                     CONF_PORT: user_input[CONF_PORT],
                     CONF_MODBUS_SLAVE_ID: user_input[CONF_MODBUS_SLAVE_ID],
                 }
-                
-                # Create entry
                 return self.async_create_entry(title=info["title"], data=self.data)
-                
-            except Exception as err:
-                _LOGGER.error("Error connecting via Modbus: %s", err)
+            except ConnectionError:
                 errors["base"] = "cannot_connect"
+            except Exception as err:
+                _LOGGER.exception("Unexpected error: %s", err)
+                errors["base"] = "unknown"
 
         data_schema = vol.Schema(
             {
                 vol.Required(CONF_HOST): cv.string,
                 vol.Required(CONF_PORT, default=DEFAULT_PORT_MODBUS): cv.port,
-                vol.Required(
-                    CONF_MODBUS_SLAVE_ID, default=DEFAULT_MODBUS_SLAVE_ID
-                ): cv.positive_int,
+                vol.Required(CONF_MODBUS_SLAVE_ID, default=DEFAULT_MODBUS_SLAVE_ID): cv.positive_int,
             }
         )
 
         return self.async_show_form(
-            step_id="modbus",
-            data_schema=data_schema,
-            errors=errors,
-            description_placeholders={
-                "name": DEFAULT_NAME,
-            },
+            step_id="modbus", data_schema=data_schema, errors=errors, description_placeholders={"name": DEFAULT_NAME}
         )
 
     async def async_step_http(
         self, user_input: Optional[dict[str, Any]] = None
     ) -> FlowResult:
         """Handle HTTP API configuration."""
-        errors = {}
-
+        errors: dict[str, str] = {}
         if user_input is not None:
             try:
-                info = await validate_http_connection(
-                    self.hass,
-                    user_input[CONF_HOST],
-                    user_input[CONF_PORT],
-                )
-                
-                # Store configuration
+                info = await validate_http_connection(self.hass, user_input[CONF_HOST], user_input[CONF_PORT])
                 self.data = {
                     CONF_CONNECTION_TYPE: CONNECTION_TYPE_HTTP,
                     CONF_HOST: user_input[CONF_HOST],
                     CONF_PORT: user_input[CONF_PORT],
                 }
-                
-                # Create entry
                 return self.async_create_entry(title=info["title"], data=self.data)
-                
-            except Exception as err:
-                _LOGGER.error("Error connecting via HTTP: %s", err)
+            except ConnectionError:
                 errors["base"] = "cannot_connect"
+            except Exception as err:
+                _LOGGER.exception("Unexpected error: %s", err)
+                errors["base"] = "unknown"
 
         data_schema = vol.Schema(
-            {
-                vol.Required(CONF_HOST): cv.string,
-                vol.Required(CONF_PORT, default=DEFAULT_PORT_HTTP): cv.port,
-            }
+            {vol.Required(CONF_HOST): cv.string, vol.Required(CONF_PORT, default=DEFAULT_PORT_HTTP): cv.port}
         )
 
         return self.async_show_form(
-            step_id="http",
-            data_schema=data_schema,
-            errors=errors,
-            description_placeholders={
-                "name": DEFAULT_NAME,
-            },
+            step_id="http", data_schema=data_schema, errors=errors, description_placeholders={"name": DEFAULT_NAME}
         )
 
     async def async_step_cloud(
         self, user_input: Optional[dict[str, Any]] = None
     ) -> FlowResult:
         """Handle cloud API configuration."""
-        errors = {}
-
+        errors: dict[str, str] = {}
         if user_input is not None:
             try:
                 info = await validate_cloud_connection(
-                    self.hass,
-                    user_input[CONF_USERNAME],
-                    user_input[CONF_PASSWORD],
-                    user_input.get(CONF_API_KEY),
+                    self.hass, user_input[CONF_USERNAME], user_input[CONF_PASSWORD], user_input.get(CONF_API_KEY)
                 )
-                
-                # Store configuration
                 self.data = {
                     CONF_CONNECTION_TYPE: CONNECTION_TYPE_CLOUD,
                     CONF_USERNAME: user_input[CONF_USERNAME],
@@ -274,13 +206,12 @@ class SungrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_API_KEY: user_input.get(CONF_API_KEY),
                     CONF_DEVICE_SN: user_input[CONF_DEVICE_SN],
                 }
-                
-                # Create entry
                 return self.async_create_entry(title=info["title"], data=self.data)
-                
-            except Exception as err:
-                _LOGGER.error("Error connecting to cloud: %s", err)
+            except ConnectionError:
                 errors["base"] = "cannot_connect"
+            except Exception as err:
+                _LOGGER.exception("Unexpected error: %s", err)
+                errors["base"] = "unknown"
 
         data_schema = vol.Schema(
             {
@@ -292,19 +223,12 @@ class SungrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
         return self.async_show_form(
-            step_id="cloud",
-            data_schema=data_schema,
-            errors=errors,
-            description_placeholders={
-                "name": DEFAULT_NAME,
-            },
+            step_id="cloud", data_schema=data_schema, errors=errors, description_placeholders={"name": DEFAULT_NAME}
         )
 
     @staticmethod
     @callback
-    def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
-    ) -> "SungrowOptionsFlow":
+    def async_get_options_flow(config_entry: config_entries.ConfigEntry) -> "SungrowOptionsFlow":
         """Get the options flow for this handler."""
         return SungrowOptionsFlow(config_entry)
 
@@ -316,9 +240,7 @@ class SungrowOptionsFlow(config_entries.OptionsFlow):
         """Initialize options flow."""
         self.config_entry = config_entry
 
-    async def async_step_init(
-        self, user_input: Optional[dict[str, Any]] = None
-    ) -> FlowResult:
+    async def async_step_init(self, user_input: Optional[dict[str, Any]] = None) -> FlowResult:
         """Manage the options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
@@ -327,9 +249,7 @@ class SungrowOptionsFlow(config_entries.OptionsFlow):
             {
                 vol.Optional(
                     CONF_SCAN_INTERVAL,
-                    default=self.config_entry.options.get(
-                        CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-                    ),
+                    default=self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
                 ): cv.positive_int,
             }
         )
