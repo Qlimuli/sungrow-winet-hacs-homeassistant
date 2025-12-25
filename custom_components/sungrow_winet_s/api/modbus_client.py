@@ -94,7 +94,7 @@ class SungrowModbusClient:
                     if not await self.connect():
                         return None
 
-                result = await self._client.read_holding_registers(
+                result = await self._client.read_input_registers(
                     address=register,
                     count=count,
                     slave=self.slave_id,
