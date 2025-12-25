@@ -57,23 +57,23 @@ MODBUS_REGISTERS: Final = {
     "battery_power": (13020, 2, 1, True),  # Battery power (W) - S32, negative=charging
     "battery_voltage": (13000, 1, 0.1, False),  # Battery voltage (V) - U16
     "battery_current": (13001, 1, 0.1, True),  # Battery current (A) - S16
-    "battery_temp": (13007, 1, 0.1, True),  # Battery temperature (°C) - S16
-    "daily_battery_charge": (13025, 1, 0.1, False),  # Daily charge (kWh) - U16
+    "battery_temp": (13025, 1, 0.1, True),  # Battery temperature (°C) - S16
+    "daily_battery_charge": (13040, 1, 0.1, False),  # Daily charge (kWh) - U16
     "daily_battery_discharge": (13026, 1, 0.1, False),  # Daily discharge (kWh) - U16
     
     # Grid
     "grid_export_power": (13009, 2, 1, True),  # Export power (W) - S32, positive=export
-    "daily_grid_export": (13034, 1, 0.1, False),  # Daily export (kWh) - U16
-    "daily_grid_import": (13035, 1, 0.1, False),  # Daily import (kWh) - U16
+    "daily_grid_export": (13045, 1, 0.1, False),  # Daily export (kWh) - U16
+    "daily_grid_import": (13036, 1, 0.1, False),  # Daily import (kWh) - U16
     "total_grid_export": (13044, 2, 1, False),  # Total export (kWh) - U32
     "total_grid_import": (13045, 2, 1, False),  # Total import (kWh) - U32
     
     # Load
-    "load_power": (13007, 2, 1, False),  # Load power (W) - U32
+    "load_power": (13008, 2, 1, True),  # Load power (W) - S32
     "daily_load_consumption": (13036, 1, 0.1, False),  # Daily load (kWh) - U16
     
     # System status
-    "inverter_status": (12999, 1, 1, False),  # Running state - U16
+    "inverter_status": (13000, 1, 1, False),  # Running state - U16
     "inverter_temp": (5007, 1, 0.1, True),  # Internal temperature (°C) - S16
     "daily_running_time": (5112, 1, 1, False),  # Daily running time (minutes) - U16
 }
