@@ -1,0 +1,7 @@
+{
+  "name": "Sungrow WINET-S Inverter",
+  "hacs": "1.6.0",
+  "domains": ["sensor"],
+  "iot_class": "Local Polling",
+  "homeassistant": "2024.1.0"
+}
