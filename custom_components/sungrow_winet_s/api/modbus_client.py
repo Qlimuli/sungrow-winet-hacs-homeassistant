@@ -4,8 +4,22 @@ import logging
 from typing import Any, Optional
 
 from pymodbus.client import AsyncModbusTcpClient
-from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
+
+# Handle Endian import for different pymodbus versions
+try:
+    # Try newer pymodbus (>= 3.3.0) - Endian is in pymodbus directly
+    from pymodbus import Endian
+except ImportError:
+    # Fallback to older pymodbus (< 3.3.0) - Endian is in constants
+    try:
+        from pymodbus.constants import Endian
+    except ImportError:
+        # Last resort: use string constants for byteorder/wordorder
+        # ">" = big-endian, "<" = little-endian
+        class Endian:
+            BIG = ">"
+            LITTLE = "<"
 
 from ..const import (
     DEFAULT_TIMEOUT,
