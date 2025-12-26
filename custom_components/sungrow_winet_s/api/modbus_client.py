@@ -8,10 +8,15 @@ from typing import Any
 
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
+from pymodbus import __version__ as pymodbus_version
 
 from ..const import MODBUS_REGISTERS, RUNNING_STATES
 
 _LOGGER = logging.getLogger(__name__)
+
+# pymodbus 3.0+ uses 'slave', older versions use 'unit'
+PYMODBUS_MAJOR_VERSION = int(pymodbus_version.split('.')[0])
+SLAVE_PARAM_NAME = "slave" if PYMODBUS_MAJOR_VERSION >= 3 else "unit"
 
 
 class SungrowModbusClient:
@@ -20,8 +25,8 @@ class SungrowModbusClient:
     def __init__(self, host: str, port: int = 502, slave_id: int = 1) -> None:
         """Initialize the Modbus client."""
         self._host = host
-        self._port = port
-        self._slave_id = slave_id
+        self._port = int(port)
+        self._slave_id = int(slave_id)
         self._client: AsyncModbusTcpClient | None = None
         self._lock = asyncio.Lock()
 
@@ -68,11 +73,12 @@ class SungrowModbusClient:
 
         async with self._lock:
             try:
-                result = await self._client.read_input_registers(
-                    address=address,
-                    count=count,
-                    slave=self._slave_id,
-                )
+                kwargs = {
+                    "address": address,
+                    "count": count,
+                    SLAVE_PARAM_NAME: self._slave_id,
+                }
+                result = await self._client.read_input_registers(**kwargs)
 
                 if result.isError():
                     _LOGGER.warning("Modbus error reading register %s: %s", address, result)
