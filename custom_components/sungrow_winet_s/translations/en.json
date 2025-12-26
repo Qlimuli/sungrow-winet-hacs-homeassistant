@@ -1,0 +1,92 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sungrow WINET-S Setup",
+        "description": "Choose how to connect to your Sungrow inverter.",
+        "data": {
+          "connection_mode": "Connection Method"
+        }
+      },
+      "modbus": {
+        "title": "Modbus TCP Configuration",
+        "description": "Enter the connection details for your WINET-S device.",
+        "data": {
+          "host": "IP Address",
+          "modbus_port": "Modbus Port",
+          "modbus_slave_id": "Slave ID"
+        }
+      },
+      "http": {
+        "title": "HTTP API Configuration",
+        "description": "Enter the connection details for your WINET-S device.",
+        "data": {
+          "host": "IP Address",
+          "port": "HTTP Port",
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "cloud": {
+        "title": "iSolarCloud Configuration",
+        "description": "Enter your iSolarCloud API credentials. Get them from {api_portal}",
+        "data": {
+          "api_key": "API Key",
+          "access_key": "Access Key",
+          "rsa_private_key": "RSA Private Key (PEM format)",
+          "plant_id": "Plant ID (optional, auto-detected)",
+          "device_sn": "Device Serial Number (optional, auto-detected)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the inverter. Please check the IP address and network connection.",
+      "invalid_auth": "Invalid authentication. Please check your credentials.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Sungrow WINET-S Options",
+        "data": {
+          "scan_interval": "Update Interval (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "pv_power": {
+        "name": "PV Power"
+      },
+      "daily_pv_energy": {
+        "name": "Daily PV Energy"
+      },
+      "total_pv_energy": {
+        "name": "Total PV Energy"
+      },
+      "battery_soc": {
+        "name": "Battery SOC"
+      },
+      "battery_power": {
+        "name": "Battery Power"
+      },
+      "grid_power": {
+        "name": "Grid Power"
+      },
+      "load_power": {
+        "name": "Load Power"
+      },
+      "inverter_temp": {
+        "name": "Inverter Temperature"
+      },
+      "running_state": {
+        "name": "Inverter Status"
+      }
+    }
+  }
+}

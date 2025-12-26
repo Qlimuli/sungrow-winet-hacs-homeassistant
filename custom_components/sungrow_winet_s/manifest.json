@@ -1,0 +1,12 @@
+{
+  "domain": "sungrow_winet_s",
+  "name": "Sungrow WINET-S Inverter",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/your-repo/sungrow-winet-s",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/your-repo/sungrow-winet-s/issues",
+  "requirements": ["pymodbus>=3.6.0", "aiohttp>=3.9.0", "cryptography>=41.0.0"],
+  "version": "1.0.0"
+}
