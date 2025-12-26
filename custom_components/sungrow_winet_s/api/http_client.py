@@ -23,10 +23,10 @@ class SungrowHttpClient:
     ) -> None:
         """Initialize the HTTP client."""
         self._host = host
-        self._port = port
+        self._port = int(port)  # Ensure port is integer to avoid URLs like "http://host:80.0/..."
         self._username = username
         self._password = password
-        self._base_url = f"http://{host}:{port}"
+        self._base_url = f"http://{host}:{self._port}"
         self._session: aiohttp.ClientSession | None = None
         self._token: str | None = None
 
