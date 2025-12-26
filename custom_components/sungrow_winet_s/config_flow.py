@@ -96,11 +96,10 @@ class SungrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._data.update(user_input)
 
-            # Test the connection
             client = SungrowModbusClient(
                 host=user_input[CONF_HOST],
-                port=user_input.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT),
-                slave_id=user_input.get(CONF_MODBUS_SLAVE_ID, DEFAULT_MODBUS_SLAVE_ID),
+                port=int(user_input.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT)),
+                slave_id=int(user_input.get(CONF_MODBUS_SLAVE_ID, DEFAULT_MODBUS_SLAVE_ID)),
             )
 
             try:
@@ -151,10 +150,9 @@ class SungrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._data.update(user_input)
 
-            # Test the connection
             client = SungrowHttpClient(
                 host=user_input[CONF_HOST],
-                port=user_input.get(CONF_PORT, 80),
+                port=int(user_input.get(CONF_PORT, 80)),
                 username=user_input.get(CONF_USERNAME, "admin"),
                 password=user_input.get(CONF_PASSWORD, "pw8888"),
             )
