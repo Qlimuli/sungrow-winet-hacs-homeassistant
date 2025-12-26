@@ -1,3 +1,0 @@
-pymodbus>=3.6.4
-aiohttp>=3.9.3
-cryptography>=42.0.5
