@@ -19,6 +19,7 @@ from .const import (
     CONF_DEVICE_SN,
     CONF_MODBUS_PORT,
     CONF_MODBUS_SLAVE_ID,
+    CONF_MODBUS_USE_TLS,
     CONF_PLANT_ID,
     CONF_RSA_PRIVATE_KEY,
     CONNECTION_MODE_CLOUD,
@@ -26,6 +27,7 @@ from .const import (
     CONNECTION_MODE_MODBUS,
     DEFAULT_MODBUS_PORT,
     DEFAULT_MODBUS_SLAVE_ID,
+    DEFAULT_MODBUS_USE_TLS,
     DOMAIN,
 )
 
@@ -94,12 +96,16 @@ class SungrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            self._data.update(user_input)
+            self._data[CONF_HOST] = user_input[CONF_HOST]
+            self._data[CONF_MODBUS_PORT] = int(user_input.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT))
+            self._data[CONF_MODBUS_SLAVE_ID] = int(user_input.get(CONF_MODBUS_SLAVE_ID, DEFAULT_MODBUS_SLAVE_ID))
+            self._data[CONF_MODBUS_USE_TLS] = user_input.get(CONF_MODBUS_USE_TLS, DEFAULT_MODBUS_USE_TLS)
 
             client = SungrowModbusClient(
-                host=user_input[CONF_HOST],
-                port=int(user_input.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT)),
-                slave_id=int(user_input.get(CONF_MODBUS_SLAVE_ID, DEFAULT_MODBUS_SLAVE_ID)),
+                host=self._data[CONF_HOST],
+                port=self._data[CONF_MODBUS_PORT],
+                slave_id=self._data[CONF_MODBUS_SLAVE_ID],
+                use_tls=self._data[CONF_MODBUS_USE_TLS],
             )
 
             try:
@@ -128,17 +134,27 @@ class SungrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                     vol.Optional(CONF_MODBUS_PORT, default=DEFAULT_MODBUS_PORT): selector.NumberSelector(
                         selector.NumberSelectorConfig(
-                            min=1, max=65535, mode=selector.NumberSelectorMode.BOX
+                            min=1,
+                            max=65535,
+                            step=1,
+                            mode=selector.NumberSelectorMode.BOX,
                         )
                     ),
                     vol.Optional(CONF_MODBUS_SLAVE_ID, default=DEFAULT_MODBUS_SLAVE_ID): selector.NumberSelector(
                         selector.NumberSelectorConfig(
-                            min=1, max=247, mode=selector.NumberSelectorMode.BOX
+                            min=1,
+                            max=247,
+                            step=1,
+                            mode=selector.NumberSelectorMode.BOX,
                         )
                     ),
+                    vol.Optional(CONF_MODBUS_USE_TLS, default=DEFAULT_MODBUS_USE_TLS): selector.BooleanSelector(),
                 }
             ),
             errors=errors,
+            description_placeholders={
+                "tls_hint": "Enable TLS for port 516, disable for port 502",
+            },
         )
 
     async def async_step_http(
@@ -148,13 +164,16 @@ class SungrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            self._data.update(user_input)
+            self._data[CONF_HOST] = user_input[CONF_HOST]
+            self._data[CONF_PORT] = int(user_input.get(CONF_PORT, 80))
+            self._data[CONF_USERNAME] = user_input.get(CONF_USERNAME, "admin")
+            self._data[CONF_PASSWORD] = user_input.get(CONF_PASSWORD, "pw8888")
 
             client = SungrowHttpClient(
-                host=user_input[CONF_HOST],
-                port=int(user_input.get(CONF_PORT, 80)),
-                username=user_input.get(CONF_USERNAME, "admin"),
-                password=user_input.get(CONF_PASSWORD, "pw8888"),
+                host=self._data[CONF_HOST],
+                port=self._data[CONF_PORT],
+                username=self._data[CONF_USERNAME],
+                password=self._data[CONF_PASSWORD],
             )
 
             try:
@@ -183,7 +202,10 @@ class SungrowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                     vol.Optional(CONF_PORT, default=80): selector.NumberSelector(
                         selector.NumberSelectorConfig(
-                            min=1, max=65535, mode=selector.NumberSelectorMode.BOX
+                            min=1,
+                            max=65535,
+                            step=1,
+                            mode=selector.NumberSelectorMode.BOX,
                         )
                     ),
                     vol.Optional(CONF_USERNAME, default="admin"): selector.TextSelector(
