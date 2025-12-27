@@ -18,6 +18,7 @@ from .const import (
     CONF_DEVICE_SN,
     CONF_MODBUS_PORT,
     CONF_MODBUS_SLAVE_ID,
+    CONF_MODBUS_USE_TLS,
     CONF_PLANT_ID,
     CONF_RSA_PRIVATE_KEY,
     CONNECTION_MODE_CLOUD,
@@ -25,6 +26,7 @@ from .const import (
     CONNECTION_MODE_MODBUS,
     DEFAULT_MODBUS_PORT,
     DEFAULT_MODBUS_SLAVE_ID,
+    DEFAULT_MODBUS_USE_TLS,
     DEFAULT_SCAN_INTERVAL_CLOUD,
     DEFAULT_SCAN_INTERVAL_LOCAL,
     DOMAIN,
@@ -65,13 +67,14 @@ class SungrowDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._connection_mode == CONNECTION_MODE_MODBUS:
             self._client = SungrowModbusClient(
                 host=config[CONF_HOST],
-                port=config.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT),
-                slave_id=config.get(CONF_MODBUS_SLAVE_ID, DEFAULT_MODBUS_SLAVE_ID),
+                port=int(config.get(CONF_MODBUS_PORT, DEFAULT_MODBUS_PORT)),
+                slave_id=int(config.get(CONF_MODBUS_SLAVE_ID, DEFAULT_MODBUS_SLAVE_ID)),
+                use_tls=config.get(CONF_MODBUS_USE_TLS, DEFAULT_MODBUS_USE_TLS),
             )
         elif self._connection_mode == CONNECTION_MODE_HTTP:
             self._client = SungrowHttpClient(
                 host=config[CONF_HOST],
-                port=config.get(CONF_PORT, 80),
+                port=int(config.get(CONF_PORT, 80)),
                 username=config.get(CONF_USERNAME, "admin"),
                 password=config.get(CONF_PASSWORD, "pw8888"),
             )
@@ -113,10 +116,14 @@ class SungrowDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @property
     def device_info(self) -> dict[str, Any]:
         """Return device information."""
+        serial = self.data.get("serial_number") if self.data else None
+        device_type = self.data.get("device_type_code") if self.data else None
+        
         return {
-            "identifiers": {(DOMAIN, self.entry.entry_id)},
-            "name": f"Sungrow Inverter ({self.entry.data.get(CONF_HOST, 'Cloud')})",
+            "identifiers": {(DOMAIN, serial or self.entry.entry_id)},
+            "name": f"Sungrow Inverter ({serial or self.entry.data.get(CONF_HOST, 'Cloud')})",
             "manufacturer": "Sungrow",
-            "model": self.data.get("device_model", "WINET-S"),
+            "model": f"Device Type {device_type}" if device_type else "WINET-S",
+            "serial_number": serial,
             "sw_version": self.data.get("firmware") if self.data else None,
         }
