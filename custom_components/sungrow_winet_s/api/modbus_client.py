@@ -1,142 +1,390 @@
-"""Modbus TCP client for Sungrow inverters."""
+"""Raw Modbus TCP client for Sungrow inverters.
+
+Based on working implementation that uses raw socket communication
+instead of pymodbus library for better Sungrow compatibility.
+"""
 from __future__ import annotations
 
 import asyncio
 import logging
+import socket
+import ssl
 import struct
 from typing import Any
-
-from pymodbus.client import AsyncModbusTcpClient
-from pymodbus.exceptions import ModbusException
-from pymodbus import __version__ as pymodbus_version
 
 from ..const import MODBUS_REGISTERS, RUNNING_STATES
 
 _LOGGER = logging.getLogger(__name__)
 
-# pymodbus 3.0+ uses 'slave', older versions use 'unit'
-PYMODBUS_MAJOR_VERSION = int(pymodbus_version.split('.')[0])
-SLAVE_PARAM_NAME = "slave" if PYMODBUS_MAJOR_VERSION >= 3 else "unit"
+# Modbus Function Codes
+FC_READ_HOLDING_REGISTERS = 0x03
+FC_READ_INPUT_REGISTERS = 0x04
 
 
 class SungrowModbusClient:
-    """Client for communicating with Sungrow inverter via Modbus TCP."""
+    """Client for communicating with Sungrow inverter via raw Modbus TCP."""
 
-    def __init__(self, host: str, port: int = 502, slave_id: int = 1) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int = 502,
+        slave_id: int = 1,
+        use_tls: bool = False,
+    ) -> None:
         """Initialize the Modbus client."""
         self._host = host
         self._port = int(port)
         self._slave_id = int(slave_id)
-        self._client: AsyncModbusTcpClient | None = None
+        self._use_tls = use_tls
+        self._socket: socket.socket | ssl.SSLSocket | None = None
         self._lock = asyncio.Lock()
+        self._transaction_id = 0
+        self._timeout = 10
+
+    def _get_next_transaction_id(self) -> int:
+        """Get next transaction ID (wraps at 65535)."""
+        self._transaction_id = (self._transaction_id + 1) & 0xFFFF
+        return self._transaction_id
+
+    def _build_modbus_request(
+        self,
+        function_code: int,
+        address: int,
+        count: int,
+    ) -> bytes:
+        """Build a Modbus TCP request frame."""
+        transaction_id = self._get_next_transaction_id()
+        protocol_id = 0
+        # Unit ID (1 byte) + Function Code (1 byte) + Address (2 bytes) + Count (2 bytes)
+        data = struct.pack(">HH", address, count)
+        length = 1 + 1 + len(data)  # unit_id + function_code + data
+
+        # MBAP Header + PDU
+        header = struct.pack(
+            ">HHHBB",
+            transaction_id,
+            protocol_id,
+            length,
+            self._slave_id,
+            function_code,
+        )
+        return header + data
+
+    def _parse_modbus_response(self, response: bytes) -> dict | None:
+        """Parse a Modbus TCP response frame."""
+        if len(response) < 9:
+            _LOGGER.warning("Response too short: %d bytes", len(response))
+            return None
+
+        transaction_id, protocol_id, length = struct.unpack(">HHH", response[:6])
+        unit_id = response[6]
+        function_code = response[7]
+
+        if len(response) < 6 + length:
+            _LOGGER.warning(
+                "Incomplete response: expected %d bytes, got %d",
+                6 + length,
+                len(response),
+            )
+            return None
+
+        # Check for exception response
+        if function_code & 0x80:
+            exception_code = response[8] if len(response) > 8 else 0
+            _LOGGER.warning(
+                "Modbus exception: function=%02x, exception=%02x",
+                function_code,
+                exception_code,
+            )
+            return None
+
+        # Data starts after byte count (response[8])
+        byte_count = response[8]
+        data = response[9 : 9 + byte_count]
+
+        return {
+            "transaction_id": transaction_id,
+            "unit_id": unit_id,
+            "function_code": function_code,
+            "data": data,
+        }
+
+    async def _send_request(self, request: bytes) -> bytes:
+        """Send request and receive response."""
+        loop = asyncio.get_event_loop()
+
+        def _sync_send_receive() -> bytes:
+            if not self._socket:
+                raise ConnectionError("Socket not connected")
+
+            self._socket.settimeout(self._timeout)
+            self._socket.sendall(request)
+
+            response = b""
+            while True:
+                try:
+                    chunk = self._socket.recv(1024)
+                    if not chunk:
+                        break
+                    response += chunk
+                    # Check if we have complete response
+                    if len(response) >= 6:
+                        _, _, length = struct.unpack(">HHH", response[:6])
+                        if len(response) >= 6 + length:
+                            break
+                except socket.timeout:
+                    break
+
+            return response
+
+        return await loop.run_in_executor(None, _sync_send_receive)
 
     async def connect(self) -> bool:
         """Establish connection to the inverter."""
-        try:
-            self._client = AsyncModbusTcpClient(
-                host=self._host,
-                port=self._port,
-                timeout=10,
-            )
-            connected = await self._client.connect()
-            if connected:
-                _LOGGER.info("Connected to Sungrow inverter at %s:%s", self._host, self._port)
-            return connected
-        except Exception as err:
-            _LOGGER.error("Failed to connect to Modbus: %s", err)
-            return False
+        async with self._lock:
+            try:
+                loop = asyncio.get_event_loop()
+
+                def _sync_connect() -> socket.socket | ssl.SSLSocket:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(self._timeout)
+                    sock.connect((self._host, self._port))
+
+                    if self._use_tls:
+                        context = ssl.create_default_context()
+                        context.check_hostname = False
+                        context.verify_mode = ssl.CERT_NONE
+                        return context.wrap_socket(sock, server_hostname=self._host)
+
+                    return sock
+
+                self._socket = await loop.run_in_executor(None, _sync_connect)
+                conn_type = "TLS" if self._use_tls else "Plain TCP"
+                _LOGGER.info(
+                    "Connected to Sungrow inverter at %s:%s (%s)",
+                    self._host,
+                    self._port,
+                    conn_type,
+                )
+                return True
+
+            except Exception as err:
+                _LOGGER.error("Failed to connect to Modbus: %s", err)
+                self._socket = None
+                return False
 
     async def disconnect(self) -> None:
         """Disconnect from the inverter."""
-        if self._client:
-            self._client.close()
-            self._client = None
-            _LOGGER.info("Disconnected from Sungrow inverter")
+        async with self._lock:
+            if self._socket:
+                try:
+                    self._socket.close()
+                except Exception:
+                    pass
+                self._socket = None
+                _LOGGER.info("Disconnected from Sungrow inverter")
 
     async def is_connected(self) -> bool:
         """Check if client is connected."""
-        return self._client is not None and self._client.connected
+        return self._socket is not None
 
-    async def read_register(
+    async def read_input_register(
         self,
-        address: int,
+        doc_address: int,
         count: int = 1,
         scale: float = 1.0,
         signed: bool = False,
-    ) -> float | int | None:
-        """Read a Modbus register and return scaled value."""
-        if not self._client or not await self.is_connected():
-            await self.connect()
+        data_type: str = "u16",
+    ) -> float | int | str | None:
+        """Read an input register (FC 04).
 
-        if not self._client:
-            return None
+        Args:
+            doc_address: The documented address (1-based from Sungrow docs)
+            count: Number of registers to read
+            scale: Scale factor to apply to the value
+            signed: Whether the value is signed
+            data_type: Data type (u16, s16, u32, s32, string)
+        """
+        return await self._read_register(
+            FC_READ_INPUT_REGISTERS,
+            doc_address,
+            count,
+            scale,
+            signed,
+            data_type,
+        )
+
+    async def read_holding_register(
+        self,
+        doc_address: int,
+        count: int = 1,
+        scale: float = 1.0,
+        signed: bool = False,
+        data_type: str = "u16",
+    ) -> float | int | str | None:
+        """Read a holding register (FC 03).
+
+        Args:
+            doc_address: The documented address (1-based from Sungrow docs)
+            count: Number of registers to read
+            scale: Scale factor to apply to the value
+            signed: Whether the value is signed
+            data_type: Data type (u16, s16, u32, s32, string)
+        """
+        return await self._read_register(
+            FC_READ_HOLDING_REGISTERS,
+            doc_address,
+            count,
+            scale,
+            signed,
+            data_type,
+        )
+
+    async def _read_register(
+        self,
+        function_code: int,
+        doc_address: int,
+        count: int,
+        scale: float,
+        signed: bool,
+        data_type: str,
+    ) -> float | int | str | None:
+        """Read a Modbus register."""
+        if not await self.is_connected():
+            if not await self.connect():
+                return None
+
+        protocol_address = doc_address - 1
 
         async with self._lock:
             try:
-                kwargs = {
-                    "address": address,
-                    "count": count,
-                    SLAVE_PARAM_NAME: self._slave_id,
-                }
-                result = await self._client.read_input_registers(**kwargs)
+                request = self._build_modbus_request(
+                    function_code,
+                    protocol_address,
+                    count,
+                )
 
-                if result.isError():
-                    _LOGGER.warning("Modbus error reading register %s: %s", address, result)
+                response = await self._send_request(request)
+
+                if not response:
+                    _LOGGER.warning("No response for register %d", doc_address)
                     return None
 
-                # Combine registers for 32-bit values
-                if count == 2:
-                    raw_value = (result.registers[0] << 16) | result.registers[1]
-                    if signed and raw_value >= 0x80000000:
-                        raw_value -= 0x100000000
-                else:
-                    raw_value = result.registers[0]
-                    if signed and raw_value >= 0x8000:
-                        raw_value -= 0x10000
+                parsed = self._parse_modbus_response(response)
+                if not parsed:
+                    return None
 
-                return raw_value * scale
+                return self._parse_register_data(
+                    parsed["data"],
+                    count,
+                    scale,
+                    signed,
+                    data_type,
+                )
 
-            except ModbusException as err:
-                _LOGGER.error("Modbus exception reading register %s: %s", address, err)
-                return None
             except Exception as err:
-                _LOGGER.error("Error reading register %s: %s", address, err)
+                _LOGGER.error("Error reading register %d: %s", doc_address, err)
+                # Disconnect on error to force reconnect
+                await self.disconnect()
                 return None
+
+    def _parse_register_data(
+        self,
+        data: bytes,
+        count: int,
+        scale: float,
+        signed: bool,
+        data_type: str,
+    ) -> float | int | str | None:
+        """Parse register data based on type."""
+        if len(data) < count * 2:
+            _LOGGER.warning(
+                "Invalid data length: expected %d, got %d",
+                count * 2,
+                len(data),
+            )
+            return None
+
+        try:
+            if data_type == "string":
+                return data.decode("utf-8", errors="ignore").strip("\x00").strip()
+
+            if data_type in ("u32", "s32") or count == 2:
+                high_word = struct.unpack(">H", data[0:2])[0]
+                low_word = struct.unpack(">H", data[2:4])[0]
+                raw_value = (high_word << 16) | low_word
+
+                if signed or data_type == "s32":
+                    if raw_value >= 0x80000000:
+                        raw_value -= 0x100000000
+
+            else:
+                # 16-bit value
+                if signed or data_type == "s16":
+                    raw_value = struct.unpack(">h", data[0:2])[0]
+                else:
+                    raw_value = struct.unpack(">H", data[0:2])[0]
+
+            return raw_value * scale
+
+        except Exception as err:
+            _LOGGER.error("Error parsing register data: %s", err)
+            return None
 
     async def read_all_data(self) -> dict[str, Any]:
         """Read all configured registers and return data dictionary."""
         data: dict[str, Any] = {}
 
         for key, reg_config in MODBUS_REGISTERS.items():
-            value = await self.read_register(
-                address=reg_config["address"],
-                count=reg_config["count"],
-                scale=reg_config["scale"],
-                signed=reg_config.get("signed", False),
-            )
+            # Determine function code based on register type
+            if reg_config.get("holding", False):
+                value = await self.read_holding_register(
+                    doc_address=reg_config["address"],
+                    count=reg_config["count"],
+                    scale=reg_config["scale"],
+                    signed=reg_config.get("signed", False),
+                    data_type=reg_config.get("type", "u16"),
+                )
+            else:
+                value = await self.read_input_register(
+                    doc_address=reg_config["address"],
+                    count=reg_config["count"],
+                    scale=reg_config["scale"],
+                    signed=reg_config.get("signed", False),
+                    data_type=reg_config.get("type", "u16"),
+                )
 
             if value is not None:
                 # Special handling for running state
                 if key == "running_state":
-                    data[key] = RUNNING_STATES.get(int(value), f"Unknown ({int(value)})")
+                    data[key] = RUNNING_STATES.get(
+                        int(value), f"Unknown ({int(value)})"
+                    )
+                elif isinstance(value, float):
+                    data[key] = round(value, 2)
                 else:
-                    data[key] = round(value, 2) if isinstance(value, float) else value
+                    data[key] = value
 
         _LOGGER.debug("Read Modbus data: %s", data)
         return data
 
     async def test_connection(self) -> bool:
-        """Test connection by reading a known register."""
+        """Test connection by reading serial number register."""
         try:
             if not await self.connect():
                 return False
 
-            # Try to read PV power register as connection test
-            value = await self.read_register(
-                address=MODBUS_REGISTERS["pv_power"]["address"],
-                count=MODBUS_REGISTERS["pv_power"]["count"],
+            # Read serial number as connection test (doc_addr 4990)
+            value = await self.read_input_register(
+                doc_address=4990,
+                count=10,
+                data_type="string",
             )
-            return value is not None
+            if value:
+                _LOGGER.info("Connected to inverter with serial: %s", value)
+                return True
+            return False
+
         except Exception as err:
             _LOGGER.error("Connection test failed: %s", err)
             return False
