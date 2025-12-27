@@ -12,7 +12,7 @@ import ssl
 import struct
 from typing import Any
 
-from ..const import MODBUS_REGISTERS, RUNNING_STATES
+from ..const import MODBUS_REGISTERS, MODBUS_HOLDING_REGISTERS, RUNNING_STATES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -336,23 +336,13 @@ class SungrowModbusClient:
         data: dict[str, Any] = {}
 
         for key, reg_config in MODBUS_REGISTERS.items():
-            # Determine function code based on register type
-            if reg_config.get("holding", False):
-                value = await self.read_holding_register(
-                    doc_address=reg_config["address"],
-                    count=reg_config["count"],
-                    scale=reg_config["scale"],
-                    signed=reg_config.get("signed", False),
-                    data_type=reg_config.get("type", "u16"),
-                )
-            else:
-                value = await self.read_input_register(
-                    doc_address=reg_config["address"],
-                    count=reg_config["count"],
-                    scale=reg_config["scale"],
-                    signed=reg_config.get("signed", False),
-                    data_type=reg_config.get("type", "u16"),
-                )
+            value = await self.read_input_register(
+                doc_address=reg_config["address"],
+                count=reg_config["count"],
+                scale=reg_config["scale"],
+                signed=reg_config.get("signed", False),
+                data_type=reg_config.get("type", "u16"),
+            )
 
             if value is not None:
                 # Special handling for running state
@@ -364,6 +354,32 @@ class SungrowModbusClient:
                     data[key] = round(value, 2)
                 else:
                     data[key] = value
+
+        clock_parts = {}
+        for key, reg_config in MODBUS_HOLDING_REGISTERS.items():
+            value = await self.read_holding_register(
+                doc_address=reg_config["address"],
+                count=reg_config["count"],
+                scale=reg_config["scale"],
+                signed=reg_config.get("signed", False),
+                data_type=reg_config.get("type", "u16"),
+            )
+            
+            if value is not None:
+                clock_parts[key] = int(value)
+
+        if all(k in clock_parts for k in [
+            "system_clock_year", "system_clock_month", "system_clock_day",
+            "system_clock_hour", "system_clock_minute", "system_clock_second"
+        ]):
+            data["system_clock"] = (
+                f"{clock_parts['system_clock_year']:04d}-"
+                f"{clock_parts['system_clock_month']:02d}-"
+                f"{clock_parts['system_clock_day']:02d} "
+                f"{clock_parts['system_clock_hour']:02d}:"
+                f"{clock_parts['system_clock_minute']:02d}:"
+                f"{clock_parts['system_clock_second']:02d}"
+            )
 
         _LOGGER.debug("Read Modbus data: %s", data)
         return data
