@@ -28,7 +28,7 @@ DEFAULT_MODBUS_PORT: Final = 502
 DEFAULT_MODBUS_SLAVE_ID: Final = 1
 DEFAULT_MODBUS_USE_TLS: Final = False
 DEFAULT_HTTP_PORT: Final = 80
-DEFAULT_SCAN_INTERVAL_LOCAL: Final = timedelta(seconds=30)
+DEFAULT_SCAN_INTERVAL_LOCAL: Final = timedelta(seconds=10)
 DEFAULT_SCAN_INTERVAL_CLOUD: Final = timedelta(minutes=5)
 
 # Note: addresses are "doc_addr" (1-based as in Sungrow documentation)
