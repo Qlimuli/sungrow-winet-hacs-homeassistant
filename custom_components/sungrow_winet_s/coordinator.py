@@ -120,11 +120,13 @@ class SungrowDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         serial = self.data.get("serial_number") if self.data else None
         device_type = self.data.get("device_type_code") if self.data else None
         
+        arm_version = self.data.get("arm_software_version") if self.data else None
+        
         return {
             "identifiers": {(DOMAIN, serial or self.entry.entry_id)},
             "name": f"Sungrow Inverter ({serial or self.entry.data.get(CONF_HOST, 'Cloud')})",
             "manufacturer": "Sungrow",
             "model": f"Device Type {device_type}" if device_type else "WINET-S",
             "serial_number": serial,
-            "sw_version": self.data.get("firmware") if self.data else None,
+            "sw_version": arm_version,
         }
