@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_PORT, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .api import SungrowCloudClient, SungrowHttpClient, SungrowModbusClient
 from .const import (
@@ -100,7 +101,7 @@ class SungrowDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             # Add metadata
             data["_connection_mode"] = self._connection_mode
-            data["_last_update"] = self.hass.util.dt.utcnow().isoformat()
+            data["_last_update"] = dt_util.utcnow().isoformat()
 
             return data
 
