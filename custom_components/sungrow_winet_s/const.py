@@ -16,6 +16,7 @@ CONNECTION_MODE_CLOUD: Final = "cloud"
 CONF_CONNECTION_MODE: Final = "connection_mode"
 CONF_MODBUS_PORT: Final = "modbus_port"
 CONF_MODBUS_SLAVE_ID: Final = "modbus_slave_id"
+CONF_MODBUS_USE_TLS: Final = "modbus_use_tls"
 CONF_API_KEY: Final = "api_key"
 CONF_ACCESS_KEY: Final = "access_key"
 CONF_RSA_PRIVATE_KEY: Final = "rsa_private_key"
@@ -25,40 +26,165 @@ CONF_DEVICE_SN: Final = "device_sn"
 # Defaults
 DEFAULT_MODBUS_PORT: Final = 502
 DEFAULT_MODBUS_SLAVE_ID: Final = 1
+DEFAULT_MODBUS_USE_TLS: Final = False
 DEFAULT_HTTP_PORT: Final = 80
 DEFAULT_SCAN_INTERVAL_LOCAL: Final = timedelta(seconds=30)
 DEFAULT_SCAN_INTERVAL_CLOUD: Final = timedelta(minutes=5)
 
-# Modbus register addresses (Sungrow standard registers)
+# Note: addresses are "doc_addr" (1-based as in Sungrow documentation)
+# The client will subtract 1 to get the protocol address
 MODBUS_REGISTERS: Final = {
-    # Input registers (read-only)
-    "pv1_voltage": {"address": 5011, "count": 1, "scale": 0.1, "unit": "V"},
-    "pv1_current": {"address": 5012, "count": 1, "scale": 0.1, "unit": "A"},
-    "pv2_voltage": {"address": 5013, "count": 1, "scale": 0.1, "unit": "V"},
-    "pv2_current": {"address": 5014, "count": 1, "scale": 0.1, "unit": "A"},
-    "pv_power": {"address": 5016, "count": 2, "scale": 1, "unit": "W", "signed": False},
-    "daily_pv_energy": {"address": 5003, "count": 1, "scale": 0.1, "unit": "kWh"},
-    "total_pv_energy": {"address": 5004, "count": 2, "scale": 0.1, "unit": "kWh"},
-    "grid_frequency": {"address": 5035, "count": 1, "scale": 0.1, "unit": "Hz"},
-    "inverter_temp": {"address": 5008, "count": 1, "scale": 0.1, "unit": "°C"},
-    "running_state": {"address": 13000, "count": 1, "scale": 1, "unit": None},
-    # Battery registers (for hybrid inverters)
-    "battery_soc": {"address": 13022, "count": 1, "scale": 0.1, "unit": "%"},
-    "battery_power": {"address": 13021, "count": 1, "scale": 1, "unit": "W", "signed": True},
-    "battery_voltage": {"address": 13019, "count": 1, "scale": 0.1, "unit": "V"},
-    "battery_current": {"address": 13020, "count": 1, "scale": 0.1, "unit": "A", "signed": True},
-    "battery_temp": {"address": 13023, "count": 1, "scale": 0.1, "unit": "°C"},
-    "daily_battery_charge": {"address": 13026, "count": 1, "scale": 0.1, "unit": "kWh"},
-    "daily_battery_discharge": {"address": 13027, "count": 1, "scale": 0.1, "unit": "kWh"},
-    # Grid registers
-    "grid_power": {"address": 13009, "count": 2, "scale": 1, "unit": "W", "signed": True},
-    "daily_import_energy": {"address": 13036, "count": 1, "scale": 0.1, "unit": "kWh"},
-    "daily_export_energy": {"address": 13045, "count": 1, "scale": 0.1, "unit": "kWh"},
-    "total_import_energy": {"address": 13037, "count": 2, "scale": 0.1, "unit": "kWh"},
-    "total_export_energy": {"address": 13046, "count": 2, "scale": 0.1, "unit": "kWh"},
-    # Load registers
-    "load_power": {"address": 13007, "count": 2, "scale": 1, "unit": "W"},
-    "daily_load_energy": {"address": 13028, "count": 1, "scale": 0.1, "unit": "kWh"},
+    # Input registers (FC 04) - Inverter data
+    "serial_number": {
+        "address": 4990,
+        "count": 10,
+        "scale": 1,
+        "type": "string",
+        "unit": None,
+    },
+    "device_type_code": {
+        "address": 5000,
+        "count": 1,
+        "scale": 1,
+        "type": "u16",
+        "unit": None,
+    },
+    "nominal_power": {
+        "address": 5001,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "kW",
+    },
+    "daily_pv_energy": {
+        "address": 5003,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "kWh",
+    },
+    "total_pv_energy": {
+        "address": 5004,
+        "count": 2,
+        "scale": 1,
+        "type": "u32",
+        "unit": "kWh",
+    },
+    "total_running_time": {
+        "address": 5006,
+        "count": 2,
+        "scale": 1,
+        "type": "u32",
+        "unit": "h",
+    },
+    "inverter_temp": {
+        "address": 5008,
+        "count": 1,
+        "scale": 0.1,
+        "type": "s16",
+        "signed": True,
+        "unit": "°C",
+    },
+    "pv1_voltage": {
+        "address": 5011,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "V",
+    },
+    "pv1_current": {
+        "address": 5012,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "A",
+    },
+    "pv_power": {
+        "address": 5017,
+        "count": 2,
+        "scale": 1,
+        "type": "u32",
+        "unit": "W",
+    },
+    "grid_voltage_a": {
+        "address": 5019,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "V",
+    },
+    "grid_voltage_b": {
+        "address": 5020,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "V",
+    },
+    "grid_voltage_c": {
+        "address": 5021,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "V",
+    },
+    "grid_current_a": {
+        "address": 5022,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "A",
+    },
+    "grid_current_b": {
+        "address": 5023,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "A",
+    },
+    "grid_current_c": {
+        "address": 5024,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "A",
+    },
+    "active_power": {
+        "address": 5031,
+        "count": 2,
+        "scale": 1,
+        "type": "u32",
+        "unit": "W",
+    },
+    "reactive_power": {
+        "address": 5033,
+        "count": 2,
+        "scale": 1,
+        "type": "s32",
+        "signed": True,
+        "unit": "var",
+    },
+    "power_factor": {
+        "address": 5035,
+        "count": 1,
+        "scale": 0.001,
+        "type": "s16",
+        "signed": True,
+        "unit": None,
+    },
+    "grid_frequency": {
+        "address": 5036,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "Hz",
+    },
+    "running_state": {
+        "address": 5038,
+        "count": 1,
+        "scale": 1,
+        "type": "u16",
+        "unit": None,
+    },
 }
 
 # Running state mapping
