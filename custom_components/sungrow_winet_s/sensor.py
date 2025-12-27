@@ -37,7 +37,7 @@ class SungrowSensorEntityDescription(SensorEntityDescription):
 
 
 SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
-    # Device Info
+    # ===== DEVICE INFO =====
     SungrowSensorEntityDescription(
         key="serial_number",
         data_key="serial_number",
@@ -53,6 +53,34 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         entity_registry_enabled_default=False,
     ),
     SungrowSensorEntityDescription(
+        key="arm_software_version",
+        data_key="arm_software_version",
+        name="ARM Software Version",
+        icon="mdi:chip",
+        entity_registry_enabled_default=False,
+    ),
+    SungrowSensorEntityDescription(
+        key="dsp_software_version",
+        data_key="dsp_software_version",
+        name="DSP Software Version",
+        icon="mdi:chip",
+        entity_registry_enabled_default=False,
+    ),
+    SungrowSensorEntityDescription(
+        key="protocol_no",
+        data_key="protocol_no",
+        name="Protocol Number",
+        icon="mdi:protocol",
+        entity_registry_enabled_default=False,
+    ),
+    SungrowSensorEntityDescription(
+        key="protocol_version",
+        data_key="protocol_version",
+        name="Protocol Version",
+        icon="mdi:protocol",
+        entity_registry_enabled_default=False,
+    ),
+    SungrowSensorEntityDescription(
         key="nominal_power",
         data_key="nominal_power",
         name="Nominal Power",
@@ -62,16 +90,15 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         icon="mdi:flash",
         entity_registry_enabled_default=False,
     ),
-    # PV Sensors
     SungrowSensorEntityDescription(
-        key="pv_power",
-        data_key="pv_power",
-        name="PV Power",
-        native_unit_of_measurement=UnitOfPower.WATT,
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:solar-power",
+        key="output_type",
+        data_key="output_type",
+        name="Output Type",
+        icon="mdi:information-outline",
+        entity_registry_enabled_default=False,
     ),
+    
+    # ===== ENERGY =====
     SungrowSensorEntityDescription(
         key="daily_pv_energy",
         data_key="daily_pv_energy",
@@ -90,19 +117,63 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL_INCREASING,
         icon="mdi:solar-power-variant",
     ),
+    
+    # ===== TEMPERATURE =====
     SungrowSensorEntityDescription(
-        key="total_running_time",
-        data_key="total_running_time",
-        name="Total Running Time",
-        native_unit_of_measurement=UnitOfTime.HOURS,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:timer-outline",
-        entity_registry_enabled_default=False,
+        key="inverter_temp",
+        data_key="inverter_temp",
+        name="Inverter Temperature",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:thermometer",
+    ),
+    
+    # ===== MPPT 1 =====
+    SungrowSensorEntityDescription(
+        key="mppt1_voltage",
+        data_key="mppt1_voltage",
+        name="MPPT 1 Voltage",
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:flash",
     ),
     SungrowSensorEntityDescription(
-        key="pv1_voltage",
-        data_key="pv1_voltage",
-        name="PV1 Voltage",
+        key="mppt1_current",
+        data_key="mppt1_current",
+        name="MPPT 1 Current",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:current-dc",
+    ),
+    
+    # ===== MPPT 2 =====
+    SungrowSensorEntityDescription(
+        key="mppt2_voltage",
+        data_key="mppt2_voltage",
+        name="MPPT 2 Voltage",
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:flash",
+    ),
+    SungrowSensorEntityDescription(
+        key="mppt2_current",
+        data_key="mppt2_current",
+        name="MPPT 2 Current",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:current-dc",
+    ),
+    
+    # ===== MPPT 3 =====
+    SungrowSensorEntityDescription(
+        key="mppt3_voltage",
+        data_key="mppt3_voltage",
+        name="MPPT 3 Voltage",
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
@@ -110,16 +181,50 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         entity_registry_enabled_default=False,
     ),
     SungrowSensorEntityDescription(
-        key="pv1_current",
-        data_key="pv1_current",
-        name="PV1 Current",
+        key="mppt3_current",
+        data_key="mppt3_current",
+        name="MPPT 3 Current",
         native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
         device_class=SensorDeviceClass.CURRENT,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:current-dc",
         entity_registry_enabled_default=False,
     ),
-    # Grid Sensors
+    
+    # ===== MPPT 4 =====
+    SungrowSensorEntityDescription(
+        key="mppt4_voltage",
+        data_key="mppt4_voltage",
+        name="MPPT 4 Voltage",
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        device_class=SensorDeviceClass.VOLTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:flash",
+        entity_registry_enabled_default=False,
+    ),
+    SungrowSensorEntityDescription(
+        key="mppt4_current",
+        data_key="mppt4_current",
+        name="MPPT 4 Current",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:current-dc",
+        entity_registry_enabled_default=False,
+    ),
+    
+    # ===== DC POWER =====
+    SungrowSensorEntityDescription(
+        key="total_dc_power",
+        data_key="total_dc_power",
+        name="Total DC Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:solar-power",
+    ),
+    
+    # ===== GRID VOLTAGE =====
     SungrowSensorEntityDescription(
         key="grid_voltage_a",
         data_key="grid_voltage_a",
@@ -128,7 +233,6 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:flash",
-        entity_registry_enabled_default=False,
     ),
     SungrowSensorEntityDescription(
         key="grid_voltage_b",
@@ -138,7 +242,6 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:flash",
-        entity_registry_enabled_default=False,
     ),
     SungrowSensorEntityDescription(
         key="grid_voltage_c",
@@ -148,47 +251,9 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:flash",
-        entity_registry_enabled_default=False,
     ),
-    SungrowSensorEntityDescription(
-        key="grid_current_a",
-        data_key="grid_current_a",
-        name="Grid Current Phase A",
-        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
-        device_class=SensorDeviceClass.CURRENT,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:current-ac",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="grid_current_b",
-        data_key="grid_current_b",
-        name="Grid Current Phase B",
-        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
-        device_class=SensorDeviceClass.CURRENT,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:current-ac",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="grid_current_c",
-        data_key="grid_current_c",
-        name="Grid Current Phase C",
-        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
-        device_class=SensorDeviceClass.CURRENT,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:current-ac",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="active_power",
-        data_key="active_power",
-        name="Active Power",
-        native_unit_of_measurement=UnitOfPower.WATT,
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:flash",
-    ),
+    
+    # ===== POWER =====
     SungrowSensorEntityDescription(
         key="reactive_power",
         data_key="reactive_power",
@@ -204,7 +269,6 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         name="Power Factor",
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:angle-acute",
-        entity_registry_enabled_default=False,
     ),
     SungrowSensorEntityDescription(
         key="grid_frequency",
@@ -214,23 +278,126 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.FREQUENCY,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:sine-wave",
+    ),
+    SungrowSensorEntityDescription(
+        key="grid_frequency_high_precision",
+        data_key="grid_frequency_high_precision",
+        name="Grid Frequency (High Precision)",
+        native_unit_of_measurement=UnitOfFrequency.HERTZ,
+        device_class=SensorDeviceClass.FREQUENCY,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:sine-wave",
         entity_registry_enabled_default=False,
     ),
-    # Inverter Sensors
+    
+    # ===== BATTERY =====
     SungrowSensorEntityDescription(
-        key="inverter_temp",
-        data_key="inverter_temp",
-        name="Inverter Temperature",
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        device_class=SensorDeviceClass.TEMPERATURE,
+        key="battery_power",
+        data_key="battery_power",
+        name="Battery Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:thermometer",
+        icon="mdi:battery",
     ),
     SungrowSensorEntityDescription(
-        key="running_state",
-        data_key="running_state",
-        name="Inverter Status",
-        icon="mdi:information-outline",
+        key="battery_current",
+        data_key="battery_current",
+        name="Battery Current",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:current-dc",
+    ),
+    SungrowSensorEntityDescription(
+        key="bdc_rated_power",
+        data_key="bdc_rated_power",
+        name="BDC Rated Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:battery",
+        entity_registry_enabled_default=False,
+    ),
+    SungrowSensorEntityDescription(
+        key="max_charging_current_bms",
+        data_key="max_charging_current_bms",
+        name="Max Charging Current (BMS)",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:battery-charging",
+        entity_registry_enabled_default=False,
+    ),
+    SungrowSensorEntityDescription(
+        key="max_discharging_current_bms",
+        data_key="max_discharging_current_bms",
+        name="Max Discharging Current (BMS)",
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:battery-minus",
+        entity_registry_enabled_default=False,
+    ),
+    
+    # ===== METER =====
+    SungrowSensorEntityDescription(
+        key="meter_power_phase_a",
+        data_key="meter_power_phase_a",
+        name="Meter Power Phase A",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:meter-electric",
+    ),
+    SungrowSensorEntityDescription(
+        key="meter_power_phase_b",
+        data_key="meter_power_phase_b",
+        name="Meter Power Phase B",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:meter-electric",
+    ),
+    SungrowSensorEntityDescription(
+        key="meter_power_phase_c",
+        data_key="meter_power_phase_c",
+        name="Meter Power Phase C",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:meter-electric",
+    ),
+    
+    # ===== EXPORT LIMITS =====
+    SungrowSensorEntityDescription(
+        key="export_limit_min",
+        data_key="export_limit_min",
+        name="Export Limit Min",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:transmission-tower-export",
+        entity_registry_enabled_default=False,
+    ),
+    SungrowSensorEntityDescription(
+        key="export_limit_max",
+        data_key="export_limit_max",
+        name="Export Limit Max",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:transmission-tower-export",
+        entity_registry_enabled_default=False,
+    ),
+    
+    # ===== SYSTEM CLOCK =====
+    SungrowSensorEntityDescription(
+        key="system_clock",
+        data_key="system_clock",
+        name="System Clock",
+        icon="mdi:clock-outline",
+        entity_registry_enabled_default=False,
     ),
 )
 
