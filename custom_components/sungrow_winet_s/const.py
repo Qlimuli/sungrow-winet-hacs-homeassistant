@@ -34,7 +34,35 @@ DEFAULT_SCAN_INTERVAL_CLOUD: Final = timedelta(minutes=5)
 # Note: addresses are "doc_addr" (1-based as in Sungrow documentation)
 # The client will subtract 1 to get the protocol address
 MODBUS_REGISTERS: Final = {
-    # Input registers (FC 04) - Inverter data
+    # ===== DEVICE INFO =====
+    "protocol_no": {
+        "address": 4950,
+        "count": 2,
+        "scale": 1,
+        "type": "u32",
+        "unit": None,
+    },
+    "protocol_version": {
+        "address": 4952,
+        "count": 2,
+        "scale": 1,
+        "type": "u32",
+        "unit": None,
+    },
+    "arm_software_version": {
+        "address": 4954,
+        "count": 15,
+        "scale": 1,
+        "type": "string",
+        "unit": None,
+    },
+    "dsp_software_version": {
+        "address": 4969,
+        "count": 15,
+        "scale": 1,
+        "type": "string",
+        "unit": None,
+    },
     "serial_number": {
         "address": 4990,
         "count": 10,
@@ -56,6 +84,15 @@ MODBUS_REGISTERS: Final = {
         "type": "u16",
         "unit": "kW",
     },
+    "output_type": {
+        "address": 5002,
+        "count": 1,
+        "scale": 1,
+        "type": "u16",
+        "unit": None,
+    },
+    
+    # ===== ENERGY =====
     "daily_pv_energy": {
         "address": 5003,
         "count": 1,
@@ -66,17 +103,12 @@ MODBUS_REGISTERS: Final = {
     "total_pv_energy": {
         "address": 5004,
         "count": 2,
-        "scale": 1,
+        "scale": 0.1,
         "type": "u32",
         "unit": "kWh",
     },
-    "total_running_time": {
-        "address": 5006,
-        "count": 2,
-        "scale": 1,
-        "type": "u32",
-        "unit": "h",
-    },
+    
+    # ===== TEMPERATURE =====
     "inverter_temp": {
         "address": 5008,
         "count": 1,
@@ -85,27 +117,81 @@ MODBUS_REGISTERS: Final = {
         "signed": True,
         "unit": "°C",
     },
-    "pv1_voltage": {
+    
+    # ===== MPPT 1 =====
+    "mppt1_voltage": {
         "address": 5011,
         "count": 1,
         "scale": 0.1,
         "type": "u16",
         "unit": "V",
     },
-    "pv1_current": {
+    "mppt1_current": {
         "address": 5012,
         "count": 1,
         "scale": 0.1,
         "type": "u16",
         "unit": "A",
     },
-    "pv_power": {
+    
+    # ===== MPPT 2 =====
+    "mppt2_voltage": {
+        "address": 5013,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "V",
+    },
+    "mppt2_current": {
+        "address": 5014,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "A",
+    },
+    
+    # ===== MPPT 3 =====
+    "mppt3_voltage": {
+        "address": 5015,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "V",
+    },
+    "mppt3_current": {
+        "address": 5016,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "A",
+    },
+    
+    # ===== MPPT 4 =====
+    "mppt4_voltage": {
+        "address": 5115,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "V",
+    },
+    "mppt4_current": {
+        "address": 5116,
+        "count": 1,
+        "scale": 0.1,
+        "type": "u16",
+        "unit": "A",
+    },
+    
+    # ===== DC POWER =====
+    "total_dc_power": {
         "address": 5017,
         "count": 2,
         "scale": 1,
         "type": "u32",
         "unit": "W",
     },
+    
+    # ===== GRID VOLTAGE =====
     "grid_voltage_a": {
         "address": 5019,
         "count": 1,
@@ -127,34 +213,8 @@ MODBUS_REGISTERS: Final = {
         "type": "u16",
         "unit": "V",
     },
-    "grid_current_a": {
-        "address": 5022,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "A",
-    },
-    "grid_current_b": {
-        "address": 5023,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "A",
-    },
-    "grid_current_c": {
-        "address": 5024,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "A",
-    },
-    "active_power": {
-        "address": 5031,
-        "count": 2,
-        "scale": 1,
-        "type": "u32",
-        "unit": "W",
-    },
+    
+    # ===== POWER =====
     "reactive_power": {
         "address": 5033,
         "count": 2,
@@ -178,8 +238,137 @@ MODBUS_REGISTERS: Final = {
         "type": "u16",
         "unit": "Hz",
     },
-    "running_state": {
-        "address": 5038,
+    
+    # ===== HIGH PRECISION GRID FREQUENCY =====
+    "grid_frequency_high_precision": {
+        "address": 5242,
+        "count": 1,
+        "scale": 0.01,
+        "type": "u16",
+        "unit": "Hz",
+    },
+    
+    # ===== BATTERY =====
+    "battery_power": {
+        "address": 5214,
+        "count": 2,
+        "scale": 1,
+        "type": "s32",
+        "signed": True,
+        "unit": "W",
+    },
+    "battery_current": {
+        "address": 5631,
+        "count": 1,
+        "scale": 0.1,
+        "type": "s16",
+        "signed": True,
+        "unit": "A",
+    },
+    "bdc_rated_power": {
+        "address": 5628,
+        "count": 1,
+        "scale": 100,
+        "type": "u16",
+        "unit": "W",
+    },
+    "max_charging_current_bms": {
+        "address": 5635,
+        "count": 1,
+        "scale": 1,
+        "type": "u16",
+        "unit": "A",
+    },
+    "max_discharging_current_bms": {
+        "address": 5636,
+        "count": 1,
+        "scale": 1,
+        "type": "u16",
+        "unit": "A",
+    },
+    
+    # ===== METER =====
+    "meter_power_phase_a": {
+        "address": 5603,
+        "count": 2,
+        "scale": 1,
+        "type": "s32",
+        "signed": True,
+        "unit": "W",
+    },
+    "meter_power_phase_b": {
+        "address": 5605,
+        "count": 2,
+        "scale": 1,
+        "type": "s32",
+        "signed": True,
+        "unit": "W",
+    },
+    "meter_power_phase_c": {
+        "address": 5607,
+        "count": 2,
+        "scale": 1,
+        "type": "s32",
+        "signed": True,
+        "unit": "W",
+    },
+    
+    # ===== EXPORT LIMITS =====
+    "export_limit_min": {
+        "address": 5622,
+        "count": 1,
+        "scale": 10,
+        "type": "u16",
+        "unit": "W",
+    },
+    "export_limit_max": {
+        "address": 5623,
+        "count": 1,
+        "scale": 10,
+        "type": "u16",
+        "unit": "W",
+    },
+}
+
+# Holding Registers (FC 03) - System clock
+MODBUS_HOLDING_REGISTERS: Final = {
+    "system_clock_year": {
+        "address": 5000,
+        "count": 1,
+        "scale": 1,
+        "type": "u16",
+        "unit": None,
+    },
+    "system_clock_month": {
+        "address": 5001,
+        "count": 1,
+        "scale": 1,
+        "type": "u16",
+        "unit": None,
+    },
+    "system_clock_day": {
+        "address": 5002,
+        "count": 1,
+        "scale": 1,
+        "type": "u16",
+        "unit": None,
+    },
+    "system_clock_hour": {
+        "address": 5003,
+        "count": 1,
+        "scale": 1,
+        "type": "u16",
+        "unit": None,
+    },
+    "system_clock_minute": {
+        "address": 5004,
+        "count": 1,
+        "scale": 1,
+        "type": "u16",
+        "unit": None,
+    },
+    "system_clock_second": {
+        "address": 5005,
         "count": 1,
         "scale": 1,
         "type": "u16",
