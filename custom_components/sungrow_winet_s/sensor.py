@@ -34,7 +34,6 @@ class SungrowSensorEntityDescription(SensorEntityDescription):
     """Describes a Sungrow sensor entity."""
 
     data_key: str
-    calculated: bool = False
 
 
 SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
@@ -117,14 +116,6 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
         icon="mdi:solar-power-variant",
-    ),
-    SungrowSensorEntityDescription(
-        key="monthly_pv_energy",
-        data_key="monthly_pv_energy",
-        name="Monthly PV Energy",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
     ),
     
     # ===== TEMPERATURE =====
@@ -405,8 +396,8 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         key="system_clock",
         data_key="system_clock",
         name="System Clock",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        icon="mdi:clock",
+        icon="mdi:clock-outline",
+        entity_registry_enabled_default=False,
     ),
 )
 
@@ -416,42 +407,48 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up sensors from a config entry."""
+    """Set up Sungrow sensors based on a config entry."""
     coordinator: SungrowDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    entities = [
-        SungrowSensorEntity(coordinator, description)
-        for description in SENSOR_DESCRIPTIONS
-        if description.data_key in coordinator.data
-    ]
+
+    entities: list[SungrowSensor] = []
+
+    for description in SENSOR_DESCRIPTIONS:
+        # Only add sensor if data is available
+        if coordinator.data and description.data_key in coordinator.data:
+            entities.append(SungrowSensor(coordinator, description))
+
     async_add_entities(entities)
 
 
-class SungrowSensorEntity(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntity):
-    """Entity representing a Sungrow sensor."""
+class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntity):
+    """Representation of a Sungrow sensor."""
 
     entity_description: SungrowSensorEntityDescription
+    _attr_has_entity_name = True
 
     def __init__(
         self,
         coordinator: SungrowDataUpdateCoordinator,
         description: SungrowSensorEntityDescription,
     ) -> None:
-        """Initialize the sensor entity."""
+        """Initialize the sensor."""
         super().__init__(coordinator)
         self.entity_description = description
-        self._attr_unique_id = (
-            f"{coordinator.entry.entry_id}_{description.key}"
-        )
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_{description.key}"
         self._attr_device_info = coordinator.device_info
 
     @property
     def native_value(self) -> Any:
-        """Return the value of the sensor."""
-        value = self.coordinator.data.get(self.entity_description.data_key)
-        if value is None:
-            return None
-            
-        # Round numeric values if appropriate
-        if isinstance(value, float):
-            return round(value, 2)
-        return value
+        """Return the state of the sensor."""
+        if self.coordinator.data:
+            return self.coordinator.data.get(self.entity_description.data_key)
+        return None
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return (
+            super().available
+            and self.coordinator.data is not None
+            and self.entity_description.data_key in self.coordinator.data
+        )
