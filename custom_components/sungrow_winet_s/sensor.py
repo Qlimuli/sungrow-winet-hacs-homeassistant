@@ -4,8 +4,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import logging
-
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -27,10 +25,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MODBUS_REGISTERS
+from .const import DOMAIN
 from .coordinator import SungrowDataUpdateCoordinator
 
-_LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, kw_only=True)
 class SungrowSensorEntityDescription(SensorEntityDescription):
@@ -397,53 +394,104 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
     
     # ===== SYSTEM CLOCK =====
     SungrowSensorEntityDescription(
-        key="system_clock_year",
-        data_key="system_clock_year",
-        name="System Clock Year",
-        icon="mdi:calendar",
+        key="system_clock",
+        data_key="system_clock",
+        name="System Clock",
+        icon="mdi:clock-outline",
+        entity_registry_enabled_default=False,
+    ),
+    
+    # ===== CALCULATED POWER =====
+    SungrowSensorEntityDescription(
+        key="mppt1_power",
+        data_key="mppt1_power",
+        name="MPPT 1 Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:solar-power",
+        calculated=True,
+    ),
+    SungrowSensorEntityDescription(
+        key="mppt2_power",
+        data_key="mppt2_power",
+        name="MPPT 2 Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:solar-power",
+        calculated=True,
+    ),
+    SungrowSensorEntityDescription(
+        key="mppt3_power",
+        data_key="mppt3_power",
+        name="MPPT 3 Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:solar-power",
+        calculated=True,
         entity_registry_enabled_default=False,
     ),
     SungrowSensorEntityDescription(
-        key="system_clock_month",
-        data_key="system_clock_month",
-        name="System Clock Month",
-        icon="mdi:calendar",
+        key="mppt4_power",
+        data_key="mppt4_power",
+        name="MPPT 4 Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:solar-power",
+        calculated=True,
         entity_registry_enabled_default=False,
     ),
     SungrowSensorEntityDescription(
-        key="system_clock_day",
-        data_key="system_clock_day",
-        name="System Clock Day",
-        icon="mdi:calendar",
-        entity_registry_enabled_default=False,
+        key="total_pv_power",
+        data_key="total_pv_power",
+        name="Total PV Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:solar-power-variant",
+        calculated=True,
     ),
     SungrowSensorEntityDescription(
-        key="system_clock_hour",
-        data_key="system_clock_hour",
-        name="System Clock Hour",
-        icon="mdi:clock",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="system_clock_minute",
-        data_key="system_clock_minute",
-        name="System Clock Minute",
-        icon="mdi:clock",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="system_clock_second",
-        data_key="system_clock_second",
-        name="System Clock Second",
-        icon="mdi:clock",
-        entity_registry_enabled_default=False,
+        key="meter_total_power",
+        data_key="meter_total_power",
+        name="Meter Total Power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:meter-electric",
+        calculated=True,
     ),
 )
 
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up Sungrow sensors based on a config entry."""
+    coordinator: SungrowDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+
+    entities: list[SungrowSensor] = []
+
+    for description in SENSOR_DESCRIPTIONS:
+        if description.calculated:
+            entities.append(SungrowSensor(coordinator, description))
+        # Only add sensor if data is available
+        elif coordinator.data and description.data_key in coordinator.data:
+            entities.append(SungrowSensor(coordinator, description))
+
+    async_add_entities(entities)
+
+
 class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntity):
-    """Basis-Sensor für Modbus-Werte."""
+    """Representation of a Sungrow sensor."""
 
     entity_description: SungrowSensorEntityDescription
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -453,100 +501,80 @@ class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntit
         """Initialize the sensor."""
         super().__init__(coordinator)
         self.entity_description = description
-        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_{description.key}"
-        self._attr_name = description.name
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_{description.key}"
+        self._attr_device_info = coordinator.device_info
 
     @property
     def native_value(self) -> Any:
-        """Return the value of the sensor."""
-        return self.coordinator.data.get(self.entity_description.data_key)
-
-class SungrowMPPTPowerSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntity):
-    """Berechneter Power-Sensor für jeden MPPT."""
-
-    def __init__(
-        self,
-        coordinator: SungrowDataUpdateCoordinator,
-        mppt_num: int,
-        voltage_key: str,
-        current_key: str,
-    ) -> None:
-        """Initialize the calculated MPPT power sensor."""
-        super().__init__(coordinator)
-        self._mppt_num = mppt_num
-        self._voltage_key = voltage_key
-        self._current_key = current_key
-        self._attr_name = f"MPPT {mppt_num} Power"
-        self._attr_native_unit_of_measurement = UnitOfPower.WATT
-        self._attr_device_class = SensorDeviceClass.POWER
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_mppt{mppt_num}_power"
-
-    @property
-    def native_value(self) -> float | None:
-        """Berechne Power = Voltage * Current."""
-        voltage = self.coordinator.data.get(self._voltage_key)
-        current = self.coordinator.data.get(self._current_key)
-        if voltage is not None and current is not None:
-            return round(voltage * current, 0)  # In Watt, ganzzahlig
+        """Return the state of the sensor."""
+        if self.coordinator.data:
+            if self.entity_description.calculated:
+                return self._calculate_value()
+            return self.coordinator.data.get(self.entity_description.data_key)
         return None
 
-class SungrowTotalPVPowerSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntity):
-    """Total PV Power als Summe aller MPPT Powers."""
-
-    def __init__(
-        self,
-        coordinator: SungrowDataUpdateCoordinator,
-        mppt_power_keys: list[str],
-    ) -> None:
-        """Initialize the total PV power sensor."""
-        super().__init__(coordinator)
-        self._mppt_power_keys = mppt_power_keys  # z.B. ['mppt1_power', 'mppt2_power', ...]
-        self._attr_name = "Total PV Power"
-        self._attr_native_unit_of_measurement = UnitOfPower.WATT
-        self._attr_device_class = SensorDeviceClass.POWER
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_total_pv_power"
+    def _calculate_value(self) -> float | None:
+        """Calculate derived sensor values."""
+        data = self.coordinator.data
+        if not data:
+            return None
+            
+        key = self.entity_description.data_key
+        
+        if key == "mppt1_power":
+            voltage = data.get("mppt1_voltage")
+            current = data.get("mppt1_current")
+            if voltage is not None and current is not None:
+                return round(voltage * current, 1)
+                
+        elif key == "mppt2_power":
+            voltage = data.get("mppt2_voltage")
+            current = data.get("mppt2_current")
+            if voltage is not None and current is not None:
+                return round(voltage * current, 1)
+                
+        elif key == "mppt3_power":
+            voltage = data.get("mppt3_voltage")
+            current = data.get("mppt3_current")
+            if voltage is not None and current is not None:
+                return round(voltage * current, 1)
+                
+        elif key == "mppt4_power":
+            voltage = data.get("mppt4_voltage")
+            current = data.get("mppt4_current")
+            if voltage is not None and current is not None:
+                return round(voltage * current, 1)
+                
+        elif key == "total_pv_power":
+            # Sum all MPPT powers
+            total = 0.0
+            for i in range(1, 5):
+                voltage = data.get(f"mppt{i}_voltage")
+                current = data.get(f"mppt{i}_current")
+                if voltage is not None and current is not None:
+                    total += voltage * current
+            return round(total, 1) if total > 0 else 0.0
+            
+        elif key == "meter_total_power":
+            # Sum all meter phase powers
+            total = 0.0
+            has_data = False
+            for phase in ["a", "b", "c"]:
+                power = data.get(f"meter_power_phase_{phase}")
+                if power is not None:
+                    total += power
+                    has_data = True
+            return round(total, 1) if has_data else None
+            
+        return None
 
     @property
-    def native_value(self) -> float | None:
-        """Summe aller MPPT Powers."""
-        total = 0.0
-        for key in self._mppt_power_keys:
-            value = self.coordinator.data.get(key)
-            if value is not None:
-                total += value
-        return round(total, 0) if total > 0 else None
-
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
-    """Set up the sensor platform."""
-    coordinator: SungrowDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    entities: list[SensorEntity] = []
-
-    # Direkte Modbus-Sensoren hinzufügen
-    for description in SENSOR_DESCRIPTIONS:
-        entities.append(SungrowSensor(coordinator, description))
-
-    # Berechnete MPPT Power-Sensoren hinzufügen (für MPPT 1-4)
-    entities.append(
-        SungrowMPPTPowerSensor(coordinator, 1, "mppt1_voltage", "mppt1_current")
-    )
-    entities.append(
-        SungrowMPPTPowerSensor(coordinator, 2, "mppt2_voltage", "mppt2_current")
-    )
-    entities.append(
-        SungrowMPPTPowerSensor(coordinator, 3, "mppt3_voltage", "mppt3_current")
-    )
-    entities.append(
-        SungrowMPPTPowerSensor(coordinator, 4, "mppt4_voltage", "mppt4_current")
-    )
-
-    # Total PV Power hinzufügen
-    mppt_power_keys = ["mppt1_power", "mppt2_power", "mppt3_power", "mppt4_power"]
-    entities.append(SungrowTotalPVPowerSensor(coordinator, mppt_power_keys))
-
-    async_add_entities(entities)
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        if self.entity_description.calculated:
+            return super().available and self.coordinator.data is not None
+        return (
+            super().available
+            and self.coordinator.data is not None
+            and self.entity_description.data_key in self.coordinator.data
+        )
