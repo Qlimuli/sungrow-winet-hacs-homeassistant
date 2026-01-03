@@ -118,6 +118,14 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL_INCREASING,
         icon="mdi:solar-power-variant",
     ),
+    SungrowSensorEntityDescription(
+        key="monthly_pv_energy",
+        data_key="monthly_pv_energy",
+        name="Monthly PV Energy",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
     
     # ===== TEMPERATURE =====
     SungrowSensorEntityDescription(
@@ -397,72 +405,8 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         key="system_clock",
         data_key="system_clock",
         name="System Clock",
-        icon="mdi:clock-outline",
-        entity_registry_enabled_default=False,
-    ),
-    
-    # ===== CALCULATED POWER =====
-    SungrowSensorEntityDescription(
-        key="mppt1_power",
-        data_key="mppt1_power",
-        name="MPPT 1 Power",
-        native_unit_of_measurement=UnitOfPower.WATT,
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:solar-power",
-        calculated=True,
-    ),
-    SungrowSensorEntityDescription(
-        key="mppt2_power",
-        data_key="mppt2_power",
-        name="MPPT 2 Power",
-        native_unit_of_measurement=UnitOfPower.WATT,
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:solar-power",
-        calculated=True,
-    ),
-    SungrowSensorEntityDescription(
-        key="mppt3_power",
-        data_key="mppt3_power",
-        name="MPPT 3 Power",
-        native_unit_of_measurement=UnitOfPower.WATT,
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:solar-power",
-        calculated=True,
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="mppt4_power",
-        data_key="mppt4_power",
-        name="MPPT 4 Power",
-        native_unit_of_measurement=UnitOfPower.WATT,
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:solar-power",
-        calculated=True,
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="total_pv_power",
-        data_key="total_pv_power",
-        name="Total PV Power",
-        native_unit_of_measurement=UnitOfPower.WATT,
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:solar-power-variant",
-        calculated=True,
-    ),
-    SungrowSensorEntityDescription(
-        key="meter_total_power",
-        data_key="meter_total_power",
-        name="Meter Total Power",
-        native_unit_of_measurement=UnitOfPower.WATT,
-        device_class=SensorDeviceClass.POWER,
-        state_class=SensorStateClass.MEASUREMENT,
-        icon="mdi:meter-electric",
-        calculated=True,
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:clock",
     ),
 )
 
@@ -472,109 +416,42 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Sungrow sensors based on a config entry."""
+    """Set up sensors from a config entry."""
     coordinator: SungrowDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-
-    entities: list[SungrowSensor] = []
-
-    for description in SENSOR_DESCRIPTIONS:
-        if description.calculated:
-            entities.append(SungrowSensor(coordinator, description))
-        # Only add sensor if data is available
-        elif coordinator.data and description.data_key in coordinator.data:
-            entities.append(SungrowSensor(coordinator, description))
-
+    entities = [
+        SungrowSensorEntity(coordinator, description)
+        for description in SENSOR_DESCRIPTIONS
+        if description.data_key in coordinator.data
+    ]
     async_add_entities(entities)
 
 
-class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntity):
-    """Representation of a Sungrow sensor."""
+class SungrowSensorEntity(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntity):
+    """Entity representing a Sungrow sensor."""
 
     entity_description: SungrowSensorEntityDescription
-    _attr_has_entity_name = True
 
     def __init__(
         self,
         coordinator: SungrowDataUpdateCoordinator,
         description: SungrowSensorEntityDescription,
     ) -> None:
-        """Initialize the sensor."""
+        """Initialize the sensor entity."""
         super().__init__(coordinator)
         self.entity_description = description
-        self._attr_unique_id = f"{coordinator.entry.entry_id}_{description.key}"
+        self._attr_unique_id = (
+            f"{coordinator.entry.entry_id}_{description.key}"
+        )
         self._attr_device_info = coordinator.device_info
 
     @property
     def native_value(self) -> Any:
-        """Return the state of the sensor."""
-        if self.coordinator.data:
-            if self.entity_description.calculated:
-                return self._calculate_value()
-            return self.coordinator.data.get(self.entity_description.data_key)
-        return None
-
-    def _calculate_value(self) -> float | None:
-        """Calculate derived sensor values."""
-        data = self.coordinator.data
-        if not data:
+        """Return the value of the sensor."""
+        value = self.coordinator.data.get(self.entity_description.data_key)
+        if value is None:
             return None
             
-        key = self.entity_description.data_key
-        
-        if key == "mppt1_power":
-            voltage = data.get("mppt1_voltage")
-            current = data.get("mppt1_current")
-            if voltage is not None and current is not None:
-                return round(voltage * current, 1)
-                
-        elif key == "mppt2_power":
-            voltage = data.get("mppt2_voltage")
-            current = data.get("mppt2_current")
-            if voltage is not None and current is not None:
-                return round(voltage * current, 1)
-                
-        elif key == "mppt3_power":
-            voltage = data.get("mppt3_voltage")
-            current = data.get("mppt3_current")
-            if voltage is not None and current is not None:
-                return round(voltage * current, 1)
-                
-        elif key == "mppt4_power":
-            voltage = data.get("mppt4_voltage")
-            current = data.get("mppt4_current")
-            if voltage is not None and current is not None:
-                return round(voltage * current, 1)
-                
-        elif key == "total_pv_power":
-            # Sum all MPPT powers
-            total = 0.0
-            for i in range(1, 5):
-                voltage = data.get(f"mppt{i}_voltage")
-                current = data.get(f"mppt{i}_current")
-                if voltage is not None and current is not None:
-                    total += voltage * current
-            return round(total, 1) if total > 0 else 0.0
-            
-        elif key == "meter_total_power":
-            # Sum all meter phase powers
-            total = 0.0
-            has_data = False
-            for phase in ["a", "b", "c"]:
-                power = data.get(f"meter_power_phase_{phase}")
-                if power is not None:
-                    total += power
-                    has_data = True
-            return round(total, 1) if has_data else None
-            
-        return None
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        if self.entity_description.calculated:
-            return super().available and self.coordinator.data is not None
-        return (
-            super().available
-            and self.coordinator.data is not None
-            and self.entity_description.data_key in self.coordinator.data
-        )
+        # Round numeric values if appropriate
+        if isinstance(value, float):
+            return round(value, 2)
+        return value
