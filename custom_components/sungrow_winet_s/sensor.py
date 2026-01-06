@@ -10,7 +10,6 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
     UnitOfEnergy,
@@ -22,7 +21,8 @@ from homeassistant.const import (
     UnitOfTime,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddEntitiesCallback, async_get_current_platform
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -405,13 +405,13 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
 )
 
 
-def setup_platform(hass: HomeAssistant, config: ConfigEntry, add_entities: AddEntitiesCallback, discovery_info=None):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the sensor platform."""
-    coordinator = hass.data[DOMAIN][config.entry_id]
+    coordinator = hass.data[DOMAIN][entry.entry_id]
     entities = []
     for description in SENSOR_DESCRIPTIONS:
         entities.append(SungrowSensorEntity(coordinator, description))
-    add_entities(entities)
+    async_add_entities(entities)
 
 
 class SungrowSensorEntity(CoordinatorEntity, SensorEntity):
