@@ -98,7 +98,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         icon="mdi:information-outline",
         entity_registry_enabled_default=False,
     ),
-
+    
     # ===== ENERGY =====
     SungrowSensorEntityDescription(
         key="daily_pv_energy",
@@ -118,129 +118,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         state_class=SensorStateClass.TOTAL_INCREASING,
         icon="mdi:solar-power-variant",
     ),
-
-    # ===== MONTHLY PV ENERGY =====
-    SungrowSensorEntityDescription(
-        key="monthly_pv_energy_january",
-        data_key="monthly_pv_energy_january",
-        name="Monthly PV Energy January",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:solar-power",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="monthly_pv_energy_february",
-        data_key="monthly_pv_energy_february",
-        name="Monthly PV Energy February",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:solar-power",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="monthly_pv_energy_march",
-        data_key="monthly_pv_energy_march",
-        name="Monthly PV Energy March",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:solar-power",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="monthly_pv_energy_april",
-        data_key="monthly_pv_energy_april",
-        name="Monthly PV Energy April",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:solar-power",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="monthly_pv_energy_may",
-        data_key="monthly_pv_energy_may",
-        name="Monthly PV Energy May",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:solar-power",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="monthly_pv_energy_june",
-        data_key="monthly_pv_energy_june",
-        name="Monthly PV Energy June",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:solar-power",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="monthly_pv_energy_july",
-        data_key="monthly_pv_energy_july",
-        name="Monthly PV Energy July",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:solar-power",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="monthly_pv_energy_august",
-        data_key="monthly_pv_energy_august",
-        name="Monthly PV Energy August",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:solar-power",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="monthly_pv_energy_september",
-        data_key="monthly_pv_energy_september",
-        name="Monthly PV Energy September",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:solar-power",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="monthly_pv_energy_october",
-        data_key="monthly_pv_energy_october",
-        name="Monthly PV Energy October",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:solar-power",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="monthly_pv_energy_november",
-        data_key="monthly_pv_energy_november",
-        name="Monthly PV Energy November",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:solar-power",
-        entity_registry_enabled_default=False,
-    ),
-    SungrowSensorEntityDescription(
-        key="monthly_pv_energy_december",
-        data_key="monthly_pv_energy_december",
-        name="Monthly PV Energy December",
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.TOTAL_INCREASING,
-        icon="mdi:solar-power",
-        entity_registry_enabled_default=False,
-    ),
-
+    
     # ===== TEMPERATURE =====
     SungrowSensorEntityDescription(
         key="inverter_temp",
@@ -251,7 +129,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:thermometer",
     ),
-
+    
     # ===== MPPT 1 =====
     SungrowSensorEntityDescription(
         key="mppt1_voltage",
@@ -271,7 +149,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:current-dc",
     ),
-
+    
     # ===== MPPT 2 =====
     SungrowSensorEntityDescription(
         key="mppt2_voltage",
@@ -291,7 +169,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:current-dc",
     ),
-
+    
     # ===== MPPT 3 =====
     SungrowSensorEntityDescription(
         key="mppt3_voltage",
@@ -313,7 +191,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         icon="mdi:current-dc",
         entity_registry_enabled_default=False,
     ),
-
+    
     # ===== MPPT 4 =====
     SungrowSensorEntityDescription(
         key="mppt4_voltage",
@@ -335,7 +213,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         icon="mdi:current-dc",
         entity_registry_enabled_default=False,
     ),
-
+    
     # ===== DC POWER =====
     SungrowSensorEntityDescription(
         key="total_dc_power",
@@ -346,7 +224,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:solar-power",
     ),
-
+    
     # ===== GRID VOLTAGE =====
     SungrowSensorEntityDescription(
         key="grid_voltage_a",
@@ -375,7 +253,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:flash",
     ),
-
+    
     # ===== POWER =====
     SungrowSensorEntityDescription(
         key="reactive_power",
@@ -412,7 +290,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         icon="mdi:sine-wave",
         entity_registry_enabled_default=False,
     ),
-
+    
     # ===== BATTERY =====
     SungrowSensorEntityDescription(
         key="battery_power",
@@ -462,7 +340,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         icon="mdi:battery-minus",
         entity_registry_enabled_default=False,
     ),
-
+    
     # ===== METER =====
     SungrowSensorEntityDescription(
         key="meter_power_phase_a",
@@ -491,7 +369,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:meter-electric",
     ),
-
+    
     # ===== EXPORT LIMITS =====
     SungrowSensorEntityDescription(
         key="export_limit_min",
@@ -513,7 +391,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         icon="mdi:transmission-tower-export",
         entity_registry_enabled_default=False,
     ),
-
+    
     # ===== SYSTEM CLOCK =====
     SungrowSensorEntityDescription(
         key="system_clock",
@@ -522,7 +400,7 @@ SENSOR_DESCRIPTIONS: tuple[SungrowSensorEntityDescription, ...] = (
         icon="mdi:clock-outline",
         entity_registry_enabled_default=False,
     ),
-
+    
     # ===== CALCULATED POWER =====
     SungrowSensorEntityDescription(
         key="mppt1_power",
@@ -602,6 +480,7 @@ async def async_setup_entry(
     for description in SENSOR_DESCRIPTIONS:
         if description.calculated:
             entities.append(SungrowSensor(coordinator, description))
+        # Only add sensor if data is available
         elif coordinator.data and description.data_key in coordinator.data:
             entities.append(SungrowSensor(coordinator, description))
 
@@ -639,34 +518,35 @@ class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntit
         data = self.coordinator.data
         if not data:
             return None
-
+            
         key = self.entity_description.data_key
-
+        
         if key == "mppt1_power":
             voltage = data.get("mppt1_voltage")
             current = data.get("mppt1_current")
             if voltage is not None and current is not None:
                 return round(voltage * current, 1)
-
+                
         elif key == "mppt2_power":
             voltage = data.get("mppt2_voltage")
             current = data.get("mppt2_current")
             if voltage is not None and current is not None:
                 return round(voltage * current, 1)
-
+                
         elif key == "mppt3_power":
             voltage = data.get("mppt3_voltage")
             current = data.get("mppt3_current")
             if voltage is not None and current is not None:
                 return round(voltage * current, 1)
-
+                
         elif key == "mppt4_power":
             voltage = data.get("mppt4_voltage")
             current = data.get("mppt4_current")
             if voltage is not None and current is not None:
                 return round(voltage * current, 1)
-
+                
         elif key == "total_pv_power":
+            # Sum all MPPT powers
             total = 0.0
             for i in range(1, 5):
                 voltage = data.get(f"mppt{i}_voltage")
@@ -674,17 +554,18 @@ class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntit
                 if voltage is not None and current is not None:
                     total += voltage * current
             return round(total, 1) if total > 0 else 0.0
-
+            
         elif key == "meter_total_power":
+            # Sum all meter phase powers
             total = 0.0
             has_data = False
-            for phase in ("a", "b", "c"):
+            for phase in ["a", "b", "c"]:
                 power = data.get(f"meter_power_phase_{phase}")
                 if power is not None:
                     total += power
                     has_data = True
             return round(total, 1) if has_data else None
-
+            
         return None
 
     @property
