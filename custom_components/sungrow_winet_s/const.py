@@ -91,7 +91,7 @@ MODBUS_REGISTERS: Final = {
         "type": "u16",
         "unit": None,
     },
-    
+
     # ===== ENERGY =====
     "daily_pv_energy": {
         "address": 5003,
@@ -107,7 +107,21 @@ MODBUS_REGISTERS: Final = {
         "type": "u32",
         "unit": "kWh",
     },
-    
+
+    # ===== MONTHLY PV ENERGY =====
+    "monthly_pv_energy_january": {"address": 6226, "count": 1, "scale": 0.1, "type": "u16", "unit": "kWh"},
+    "monthly_pv_energy_february": {"address": 6227, "count": 1, "scale": 0.1, "type": "u16", "unit": "kWh"},
+    "monthly_pv_energy_march": {"address": 6228, "count": 1, "scale": 0.1, "type": "u16", "unit": "kWh"},
+    "monthly_pv_energy_april": {"address": 6229, "count": 1, "scale": 0.1, "type": "u16", "unit": "kWh"},
+    "monthly_pv_energy_may": {"address": 6230, "count": 1, "scale": 0.1, "type": "u16", "unit": "kWh"},
+    "monthly_pv_energy_june": {"address": 6231, "count": 1, "scale": 0.1, "type": "u16", "unit": "kWh"},
+    "monthly_pv_energy_july": {"address": 6232, "count": 1, "scale": 0.1, "type": "u16", "unit": "kWh"},
+    "monthly_pv_energy_august": {"address": 6233, "count": 1, "scale": 0.1, "type": "u16", "unit": "kWh"},
+    "monthly_pv_energy_september": {"address": 6234, "count": 1, "scale": 0.1, "type": "u16", "unit": "kWh"},
+    "monthly_pv_energy_october": {"address": 6235, "count": 1, "scale": 0.1, "type": "u16", "unit": "kWh"},
+    "monthly_pv_energy_november": {"address": 6236, "count": 1, "scale": 0.1, "type": "u16", "unit": "kWh"},
+    "monthly_pv_energy_december": {"address": 6237, "count": 1, "scale": 0.1, "type": "u16", "unit": "kWh"},
+
     # ===== TEMPERATURE =====
     "inverter_temp": {
         "address": 5008,
@@ -117,263 +131,64 @@ MODBUS_REGISTERS: Final = {
         "signed": True,
         "unit": "°C",
     },
-    
+
     # ===== MPPT 1 =====
-    "mppt1_voltage": {
-        "address": 5011,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "V",
-    },
-    "mppt1_current": {
-        "address": 5012,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "A",
-    },
-    
+    "mppt1_voltage": {"address": 5011, "count": 1, "scale": 0.1, "type": "u16", "unit": "V"},
+    "mppt1_current": {"address": 5012, "count": 1, "scale": 0.1, "type": "u16", "unit": "A"},
+
     # ===== MPPT 2 =====
-    "mppt2_voltage": {
-        "address": 5013,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "V",
-    },
-    "mppt2_current": {
-        "address": 5014,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "A",
-    },
-    
+    "mppt2_voltage": {"address": 5013, "count": 1, "scale": 0.1, "type": "u16", "unit": "V"},
+    "mppt2_current": {"address": 5014, "count": 1, "scale": 0.1, "type": "u16", "unit": "A"},
+
     # ===== MPPT 3 =====
-    "mppt3_voltage": {
-        "address": 5015,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "V",
-    },
-    "mppt3_current": {
-        "address": 5016,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "A",
-    },
-    
+    "mppt3_voltage": {"address": 5015, "count": 1, "scale": 0.1, "type": "u16", "unit": "V"},
+    "mppt3_current": {"address": 5016, "count": 1, "scale": 0.1, "type": "u16", "unit": "A"},
+
     # ===== MPPT 4 =====
-    "mppt4_voltage": {
-        "address": 5115,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "V",
-    },
-    "mppt4_current": {
-        "address": 5116,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "A",
-    },
-    
+    "mppt4_voltage": {"address": 5115, "count": 1, "scale": 0.1, "type": "u16", "unit": "V"},
+    "mppt4_current": {"address": 5116, "count": 1, "scale": 0.1, "type": "u16", "unit": "A"},
+
     # ===== DC POWER =====
-    "total_dc_power": {
-        "address": 5017,
-        "count": 2,
-        "scale": 1,
-        "type": "u32",
-        "unit": "W",
-    },
-    
+    "total_dc_power": {"address": 5017, "count": 2, "scale": 1, "type": "u32", "unit": "W"},
+
     # ===== GRID VOLTAGE =====
-    "grid_voltage_a": {
-        "address": 5019,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "V",
-    },
-    "grid_voltage_b": {
-        "address": 5020,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "V",
-    },
-    "grid_voltage_c": {
-        "address": 5021,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "V",
-    },
-    
+    "grid_voltage_a": {"address": 5019, "count": 1, "scale": 0.1, "type": "u16", "unit": "V"},
+    "grid_voltage_b": {"address": 5020, "count": 1, "scale": 0.1, "type": "u16", "unit": "V"},
+    "grid_voltage_c": {"address": 5021, "count": 1, "scale": 0.1, "type": "u16", "unit": "V"},
+
     # ===== POWER =====
-    "reactive_power": {
-        "address": 5033,
-        "count": 2,
-        "scale": 1,
-        "type": "s32",
-        "signed": True,
-        "unit": "var",
-    },
-    "power_factor": {
-        "address": 5035,
-        "count": 1,
-        "scale": 0.001,
-        "type": "s16",
-        "signed": True,
-        "unit": None,
-    },
-    "grid_frequency": {
-        "address": 5036,
-        "count": 1,
-        "scale": 0.1,
-        "type": "u16",
-        "unit": "Hz",
-    },
-    
+    "reactive_power": {"address": 5033, "count": 2, "scale": 1, "type": "s32", "signed": True, "unit": "var"},
+    "power_factor": {"address": 5035, "count": 1, "scale": 0.001, "type": "s16", "signed": True, "unit": None},
+    "grid_frequency": {"address": 5036, "count": 1, "scale": 0.1, "type": "u16", "unit": "Hz"},
+
     # ===== HIGH PRECISION GRID FREQUENCY =====
-    "grid_frequency_high_precision": {
-        "address": 5242,
-        "count": 1,
-        "scale": 0.01,
-        "type": "u16",
-        "unit": "Hz",
-    },
-    
+    "grid_frequency_high_precision": {"address": 5242, "count": 1, "scale": 0.01, "type": "u16", "unit": "Hz"},
+
     # ===== BATTERY =====
-    "battery_power": {
-        "address": 5214,
-        "count": 2,
-        "scale": 1,
-        "type": "s32",
-        "signed": True,
-        "unit": "W",
-    },
-    "battery_current": {
-        "address": 5631,
-        "count": 1,
-        "scale": 0.1,
-        "type": "s16",
-        "signed": True,
-        "unit": "A",
-    },
-    "bdc_rated_power": {
-        "address": 5628,
-        "count": 1,
-        "scale": 100,
-        "type": "u16",
-        "unit": "W",
-    },
-    "max_charging_current_bms": {
-        "address": 5635,
-        "count": 1,
-        "scale": 1,
-        "type": "u16",
-        "unit": "A",
-    },
-    "max_discharging_current_bms": {
-        "address": 5636,
-        "count": 1,
-        "scale": 1,
-        "type": "u16",
-        "unit": "A",
-    },
-    
+    "battery_power": {"address": 5214, "count": 2, "scale": 1, "type": "s32", "signed": True, "unit": "W"},
+    "battery_current": {"address": 5631, "count": 1, "scale": 0.1, "type": "s16", "signed": True, "unit": "A"},
+    "bdc_rated_power": {"address": 5628, "count": 1, "scale": 100, "type": "u16", "unit": "W"},
+    "max_charging_current_bms": {"address": 5635, "count": 1, "scale": 1, "type": "u16", "unit": "A"},
+    "max_discharging_current_bms": {"address": 5636, "count": 1, "scale": 1, "type": "u16", "unit": "A"},
+
     # ===== METER =====
-    "meter_power_phase_a": {
-        "address": 5603,
-        "count": 2,
-        "scale": 1,
-        "type": "s32",
-        "signed": True,
-        "unit": "W",
-    },
-    "meter_power_phase_b": {
-        "address": 5605,
-        "count": 2,
-        "scale": 1,
-        "type": "s32",
-        "signed": True,
-        "unit": "W",
-    },
-    "meter_power_phase_c": {
-        "address": 5607,
-        "count": 2,
-        "scale": 1,
-        "type": "s32",
-        "signed": True,
-        "unit": "W",
-    },
-    
+    "meter_power_phase_a": {"address": 5603, "count": 2, "scale": 1, "type": "s32", "signed": True, "unit": "W"},
+    "meter_power_phase_b": {"address": 5605, "count": 2, "scale": 1, "type": "s32", "signed": True, "unit": "W"},
+    "meter_power_phase_c": {"address": 5607, "count": 2, "scale": 1, "type": "s32", "signed": True, "unit": "W"},
+
     # ===== EXPORT LIMITS =====
-    "export_limit_min": {
-        "address": 5622,
-        "count": 1,
-        "scale": 10,
-        "type": "u16",
-        "unit": "W",
-    },
-    "export_limit_max": {
-        "address": 5623,
-        "count": 1,
-        "scale": 10,
-        "type": "u16",
-        "unit": "W",
-    },
+    "export_limit_min": {"address": 5622, "count": 1, "scale": 10, "type": "u16", "unit": "W"},
+    "export_limit_max": {"address": 5623, "count": 1, "scale": 10, "type": "u16", "unit": "W"},
 }
 
 # Holding Registers (FC 03) - System clock
 MODBUS_HOLDING_REGISTERS: Final = {
-    "system_clock_year": {
-        "address": 5000,
-        "count": 1,
-        "scale": 1,
-        "type": "u16",
-        "unit": None,
-    },
-    "system_clock_month": {
-        "address": 5001,
-        "count": 1,
-        "scale": 1,
-        "type": "u16",
-        "unit": None,
-    },
-    "system_clock_day": {
-        "address": 5002,
-        "count": 1,
-        "scale": 1,
-        "type": "u16",
-        "unit": None,
-    },
-    "system_clock_hour": {
-        "address": 5003,
-        "count": 1,
-        "scale": 1,
-        "type": "u16",
-        "unit": None,
-    },
-    "system_clock_minute": {
-        "address": 5004,
-        "count": 1,
-        "scale": 1,
-        "type": "u16",
-        "unit": None,
-    },
-    "system_clock_second": {
-        "address": 5005,
-        "count": 1,
-        "scale": 1,
-        "type": "u16",
-        "unit": None,
-    },
+    "system_clock_year": {"address": 5000, "count": 1, "scale": 1, "type": "u16", "unit": None},
+    "system_clock_month": {"address": 5001, "count": 1, "scale": 1, "type": "u16", "unit": None},
+    "system_clock_day": {"address": 5002, "count": 1, "scale": 1, "type": "u16", "unit": None},
+    "system_clock_hour": {"address": 5003, "count": 1, "scale": 1, "type": "u16", "unit": None},
+    "system_clock_minute": {"address": 5004, "count": 1, "scale": 1, "type": "u16", "unit": None},
+    "system_clock_second": {"address": 5005, "count": 1, "scale": 1, "type": "u16", "unit": None},
 }
 
 # Running state mapping
