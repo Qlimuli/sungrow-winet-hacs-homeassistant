@@ -107,6 +107,13 @@ MODBUS_REGISTERS: Final = {
         "type": "u32",
         "unit": "kWh",
     },
+    "monthly_pv_energy": {
+        "address": 5128,
+        "count": 2,
+        "scale": 0.1,
+        "type": "u32",
+        "unit": "kWh",
+    },
     
     # ===== TEMPERATURE =====
     "inverter_temp": {
