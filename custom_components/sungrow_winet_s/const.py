@@ -108,7 +108,7 @@ MODBUS_REGISTERS: Final = {
         "unit": "kWh",
     },
     "monthly_pv_energy": {
-        "address": 6238,
+        "address": 6227,
         "count": 1,
         "scale": 0.1,
         "type": "u16",
