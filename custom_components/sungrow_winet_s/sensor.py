@@ -508,55 +508,55 @@ class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntit
         if self.coordinator.data:
             if self.entity_description.calculated:
                 return self._calculate_value()
+            
             value = self.coordinator.data.get(self.entity_description.data_key)
             
-            # Validate the value before returning
+            # Check for obvious error values (0xFFFF patterns)
             if value is not None and self._is_valid_value(value):
+                # Cache valid values for fallback
                 self._last_valid_value = value
                 return value
             
-            # Return last valid value if current is invalid
-            if hasattr(self, '_last_valid_value'):
-                return self._last_valid_value
-                
+            # If current value is invalid (error code), try to use cached value
+            if value is not None and not self._is_valid_value(value):
+                if hasattr(self, '_last_valid_value'):
+                    return self._last_valid_value
+            
+            # Return the value even if None - this is normal for some sensors
             return value
+        
+        # No data from coordinator - try cached value
+        if hasattr(self, '_last_valid_value'):
+            return self._last_valid_value
+            
         return None
 
     def _is_valid_value(self, value: Any) -> bool:
-        """Check if a value is valid and within expected ranges."""
+        """Check if a value is valid.
+        
+        This is a very permissive check - we only reject truly impossible values
+        like 0xFFFF error codes or extremely large numbers that indicate read errors.
+        We do NOT reject values based on expected ranges, as this causes sensors
+        to become unavailable during normal operation (e.g., 0 Hz when grid is disconnected).
+        """
         if value is None:
             return False
             
         if isinstance(value, str):
-            return len(value.strip()) > 0
+            # Empty strings are still valid - they just indicate no data
+            return True
         
         if isinstance(value, (int, float)):
-            # Check for obviously invalid values
-            if abs(value) > 1e9:
+            # Only reject values that are clearly error codes
+            # 0xFFFF (65535) or 0xFFFFFFFF (4294967295) often indicate read errors
+            if value == 65535 or value == 4294967295:
                 return False
             
-            # Specific range checks based on device class
-            device_class = self.entity_description.device_class
-            
-            if device_class == SensorDeviceClass.TEMPERATURE:
-                # Temperature should be between -50 and 150 C
-                return -50 <= value <= 150
-            elif device_class == SensorDeviceClass.VOLTAGE:
-                # Voltage should be positive and reasonable
-                return 0 <= value <= 2000
-            elif device_class == SensorDeviceClass.CURRENT:
-                # Current can be negative (battery) but within limits
-                return -500 <= value <= 500
-            elif device_class == SensorDeviceClass.FREQUENCY:
-                # Grid frequency should be around 50/60 Hz
-                return 40 <= value <= 70
-            elif device_class == SensorDeviceClass.POWER:
-                # Power can be large but not unreasonable
-                return -200000 <= value <= 200000
-            elif device_class == SensorDeviceClass.ENERGY:
-                # Energy should be positive
-                return value >= 0
+            # Reject extremely large values that indicate data corruption
+            if abs(value) > 1e12:
+                return False
         
+        # Accept all other values - let Home Assistant handle display
         return True
 
     def _calculate_value(self) -> float | None:
@@ -625,25 +625,17 @@ class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntit
 
     @property
     def available(self) -> bool:
-        """Return True if entity is available."""
-        # First check if coordinator is available
+        """Return True if entity is available.
+        
+        Sensors should remain available as long as the coordinator is working.
+        We don't mark sensors unavailable just because a specific value is missing
+        or invalid - this prevents entities from being randomly disabled.
+        """
+        # Check if coordinator itself is available
         if not super().available:
-            # Even if coordinator has issues, if we have cached data, stay available
-            if hasattr(self, '_last_valid_value'):
-                return True
             return False
         
-        # If coordinator has no data at all, check for cached value
-        if self.coordinator.data is None:
-            return hasattr(self, '_last_valid_value')
-        
-        # Calculated sensors are available if coordinator has data
-        if self.entity_description.calculated:
-            return True
-            
-        # For non-calculated sensors, check if we have the key in current data
-        # or if we have a cached value from previous successful reads
-        has_current_data = self.entity_description.data_key in self.coordinator.data
-        has_cached_value = hasattr(self, '_last_valid_value')
-        
-        return has_current_data or has_cached_value
+        # If coordinator is available, all sensors are available
+        # Even if data is None or missing specific keys, we return True
+        # to prevent Home Assistant from disabling entities
+        return True
