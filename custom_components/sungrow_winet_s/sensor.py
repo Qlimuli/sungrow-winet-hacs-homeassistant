@@ -475,14 +475,12 @@ async def async_setup_entry(
     """Set up Sungrow sensors based on a config entry."""
     coordinator: SungrowDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    entities: list[SungrowSensor] = []
-
-    for description in SENSOR_DESCRIPTIONS:
-        if description.calculated:
-            entities.append(SungrowSensor(coordinator, description))
-        # Only add sensor if data is available
-        elif coordinator.data and description.data_key in coordinator.data:
-            entities.append(SungrowSensor(coordinator, description))
+    # Create all sensors regardless of current data availability
+    # This ensures entities are always registered and won't be randomly disabled
+    entities: list[SungrowSensor] = [
+        SungrowSensor(coordinator, description)
+        for description in SENSOR_DESCRIPTIONS
+    ]
 
     async_add_entities(entities)
 
@@ -628,19 +626,23 @@ class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntit
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        # Entity is available if coordinator is working and we have any data
-        # (including cached data)
+        # First check if coordinator is available
         if not super().available:
-            return False
-            
-        if self.coordinator.data is None:
+            # Even if coordinator has issues, if we have cached data, stay available
+            if hasattr(self, '_last_valid_value'):
+                return True
             return False
         
+        # If coordinator has no data at all, check for cached value
+        if self.coordinator.data is None:
+            return hasattr(self, '_last_valid_value')
+        
+        # Calculated sensors are available if coordinator has data
         if self.entity_description.calculated:
             return True
             
-        # For non-calculated sensors, check if we have the key
-        # or if we have a cached value
+        # For non-calculated sensors, check if we have the key in current data
+        # or if we have a cached value from previous successful reads
         has_current_data = self.entity_description.data_key in self.coordinator.data
         has_cached_value = hasattr(self, '_last_valid_value')
         
