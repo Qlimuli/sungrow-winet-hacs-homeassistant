@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import time
 from typing import Any
 
 import aiohttp
@@ -29,6 +30,12 @@ class SungrowHttpClient:
         self._base_url = f"http://{host}:{self._port}"
         self._session: aiohttp.ClientSession | None = None
         self._token: str | None = None
+        
+        # Stability improvements
+        self._retry_count = 3
+        self._retry_delay = 1.0
+        self._last_valid_data: dict[str, Any] = {}
+        self._last_successful_read: float = 0
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
@@ -122,26 +129,89 @@ class SungrowHttpClient:
             _LOGGER.error("HTTP request error: %s", err)
             return None
 
+    async def _request_with_retry(self, service: str, params: dict | None = None) -> dict[str, Any] | None:
+        """Make API request with retry logic."""
+        for attempt in range(self._retry_count):
+            try:
+                result = await self._request(service, params)
+                if result is not None:
+                    return result
+                    
+                if attempt < self._retry_count - 1:
+                    await asyncio.sleep(self._retry_delay * (attempt + 1))
+                    
+            except Exception as err:
+                _LOGGER.debug(
+                    "HTTP request attempt %d failed for %s: %s",
+                    attempt + 1,
+                    service,
+                    err,
+                )
+                if attempt < self._retry_count - 1:
+                    await asyncio.sleep(self._retry_delay * (attempt + 1))
+        
+        return None
+
     async def read_all_data(self) -> dict[str, Any]:
         """Read all available data from HTTP API."""
         data: dict[str, Any] = {}
+        errors = 0
 
         # Get real-time data
-        realtime = await self._request("real_time_data")
+        realtime = await self._request_with_retry("real_time_data")
         if realtime:
-            data.update(self._parse_realtime_data(realtime))
+            parsed = self._parse_realtime_data(realtime)
+            data.update(parsed)
+            # Cache valid data
+            for key, value in parsed.items():
+                if value is not None:
+                    self._last_valid_data[key] = value
+        else:
+            errors += 1
+            # Use cached data if available
+            for key in ["pv_power", "daily_pv_energy", "total_pv_energy", "grid_power", 
+                       "load_power", "battery_soc", "battery_power", "inverter_temp", "running_state"]:
+                if key in self._last_valid_data:
+                    data[key] = self._last_valid_data[key]
 
         # Get device info
-        device_info = await self._request("device_info")
+        device_info = await self._request_with_retry("device_info")
         if device_info:
             data["device_model"] = device_info.get("dev_model", "Unknown")
             data["device_sn"] = device_info.get("dev_sn", "Unknown")
             data["firmware"] = device_info.get("sw_ver", "Unknown")
+            # Cache device info
+            self._last_valid_data["device_model"] = data["device_model"]
+            self._last_valid_data["device_sn"] = data["device_sn"]
+            self._last_valid_data["firmware"] = data["firmware"]
+        else:
+            errors += 1
+            # Use cached device info
+            for key in ["device_model", "device_sn", "firmware"]:
+                if key in self._last_valid_data:
+                    data[key] = self._last_valid_data[key]
 
         # Get statistics
-        statistics = await self._request("statistics")
+        statistics = await self._request_with_retry("statistics")
         if statistics:
-            data.update(self._parse_statistics(statistics))
+            parsed = self._parse_statistics(statistics)
+            data.update(parsed)
+            # Cache valid data
+            for key, value in parsed.items():
+                if value is not None:
+                    self._last_valid_data[key] = value
+        else:
+            errors += 1
+            # Use cached statistics
+            for key in ["daily_import_energy", "daily_export_energy", "daily_battery_charge",
+                       "daily_battery_discharge", "daily_load_energy"]:
+                if key in self._last_valid_data:
+                    data[key] = self._last_valid_data[key]
+
+        if errors == 0:
+            self._last_successful_read = time.time()
+        elif errors > 0:
+            _LOGGER.warning("HTTP read completed with %d errors", errors)
 
         return data
 
