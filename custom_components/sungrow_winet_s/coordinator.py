@@ -70,7 +70,7 @@ class SungrowDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._last_valid_data: dict[str, Any] = {}
         self._last_successful_update: float = 0
         self._consecutive_failures = 0
-        self._max_consecutive_failures = 3
+        self._max_consecutive_failures = 10  # More tolerant before reconnect
         self._reconnect_delay = 5.0
 
     def _init_client(self) -> None:
@@ -108,56 +108,62 @@ class SungrowDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             data = await self._client.read_all_data()
 
-            if not data:
-                self._consecutive_failures += 1
-                _LOGGER.warning(
-                    "No data received (attempt %d/%d)",
-                    self._consecutive_failures,
-                    self._max_consecutive_failures,
-                )
+            # Consider partial data as success - don't fail if we got some data
+            if data:
+                # We got data - this is a success even if some values are missing
+                self._consecutive_failures = 0
+                self._last_successful_update = time.time()
                 
-                # Return cached data if available and not too old
-                if self._last_valid_data and (time.time() - self._last_successful_update) < MAX_DATA_AGE:
-                    _LOGGER.info("Using cached data from last successful update")
-                    return self._merge_with_cached_data({})
+                # Merge with cached data to fill in any missing values
+                data = self._merge_with_cached_data(data)
                 
-                # Try to reconnect if too many failures
-                if self._consecutive_failures >= self._max_consecutive_failures:
-                    _LOGGER.warning("Too many consecutive failures, attempting reconnect")
-                    await self._reconnect()
-                    
-                raise UpdateFailed("No data received from inverter")
+                # Update cache with new valid data
+                self._update_cache(data)
 
-            # Reset failure counter on success
-            self._consecutive_failures = 0
-            self._last_successful_update = time.time()
+                # Add metadata
+                data["_connection_mode"] = self._connection_mode
+                data["_last_update"] = dt_util.utcnow().isoformat()
+
+                return data
             
-            # Merge with cached data to fill in any missing values
-            data = self._merge_with_cached_data(data)
+            # No data at all - this is a problem
+            self._consecutive_failures += 1
+            _LOGGER.debug(
+                "No data received (attempt %d/%d)",
+                self._consecutive_failures,
+                self._max_consecutive_failures,
+            )
             
-            # Update cache with new valid data
-            self._update_cache(data)
-
-            # Add metadata
-            data["_connection_mode"] = self._connection_mode
-            data["_last_update"] = dt_util.utcnow().isoformat()
-
-            return data
+            # Return cached data if available and not too old
+            if self._last_valid_data and (time.time() - self._last_successful_update) < MAX_DATA_AGE:
+                _LOGGER.debug("Using cached data from last successful update")
+                cached = self._merge_with_cached_data({})
+                cached["_connection_mode"] = self._connection_mode
+                cached["_last_update"] = dt_util.utcnow().isoformat()
+                cached["_using_cached"] = True
+                return cached
+            
+            # Try to reconnect if too many failures
+            if self._consecutive_failures >= self._max_consecutive_failures:
+                _LOGGER.warning("Too many consecutive failures, attempting reconnect")
+                await self._reconnect()
+                
+            raise UpdateFailed("No data received from inverter")
 
         except UpdateFailed:
             raise
         except Exception as err:
             self._consecutive_failures += 1
-            _LOGGER.error(
+            _LOGGER.debug(
                 "Error fetching data (attempt %d/%d): %s",
                 self._consecutive_failures,
                 self._max_consecutive_failures,
                 err,
             )
             
-            # Return cached data if available
+            # Return cached data if available - don't raise error if we have cache
             if self._last_valid_data and (time.time() - self._last_successful_update) < MAX_DATA_AGE:
-                _LOGGER.info("Returning cached data due to error")
+                _LOGGER.debug("Returning cached data due to error")
                 cached = self._merge_with_cached_data({})
                 cached["_connection_mode"] = self._connection_mode
                 cached["_last_update"] = dt_util.utcnow().isoformat()
