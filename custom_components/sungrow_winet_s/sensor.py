@@ -510,8 +510,56 @@ class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntit
         if self.coordinator.data:
             if self.entity_description.calculated:
                 return self._calculate_value()
-            return self.coordinator.data.get(self.entity_description.data_key)
+            value = self.coordinator.data.get(self.entity_description.data_key)
+            
+            # Validate the value before returning
+            if value is not None and self._is_valid_value(value):
+                self._last_valid_value = value
+                return value
+            
+            # Return last valid value if current is invalid
+            if hasattr(self, '_last_valid_value'):
+                return self._last_valid_value
+                
+            return value
         return None
+
+    def _is_valid_value(self, value: Any) -> bool:
+        """Check if a value is valid and within expected ranges."""
+        if value is None:
+            return False
+            
+        if isinstance(value, str):
+            return len(value.strip()) > 0
+        
+        if isinstance(value, (int, float)):
+            # Check for obviously invalid values
+            if abs(value) > 1e9:
+                return False
+            
+            # Specific range checks based on device class
+            device_class = self.entity_description.device_class
+            
+            if device_class == SensorDeviceClass.TEMPERATURE:
+                # Temperature should be between -50 and 150 C
+                return -50 <= value <= 150
+            elif device_class == SensorDeviceClass.VOLTAGE:
+                # Voltage should be positive and reasonable
+                return 0 <= value <= 2000
+            elif device_class == SensorDeviceClass.CURRENT:
+                # Current can be negative (battery) but within limits
+                return -500 <= value <= 500
+            elif device_class == SensorDeviceClass.FREQUENCY:
+                # Grid frequency should be around 50/60 Hz
+                return 40 <= value <= 70
+            elif device_class == SensorDeviceClass.POWER:
+                # Power can be large but not unreasonable
+                return -200000 <= value <= 200000
+            elif device_class == SensorDeviceClass.ENERGY:
+                # Energy should be positive
+                return value >= 0
+        
+        return True
 
     def _calculate_value(self) -> float | None:
         """Calculate derived sensor values."""
@@ -521,27 +569,36 @@ class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntit
             
         key = self.entity_description.data_key
         
+        def get_valid_number(key: str) -> float | None:
+            """Get a valid numeric value from data."""
+            val = data.get(key)
+            if val is not None and isinstance(val, (int, float)):
+                # Validate the value
+                if abs(val) < 1e9:
+                    return float(val)
+            return None
+        
         if key == "mppt1_power":
-            voltage = data.get("mppt1_voltage")
-            current = data.get("mppt1_current")
+            voltage = get_valid_number("mppt1_voltage")
+            current = get_valid_number("mppt1_current")
             if voltage is not None and current is not None:
                 return round(voltage * current, 1)
                 
         elif key == "mppt2_power":
-            voltage = data.get("mppt2_voltage")
-            current = data.get("mppt2_current")
+            voltage = get_valid_number("mppt2_voltage")
+            current = get_valid_number("mppt2_current")
             if voltage is not None and current is not None:
                 return round(voltage * current, 1)
                 
         elif key == "mppt3_power":
-            voltage = data.get("mppt3_voltage")
-            current = data.get("mppt3_current")
+            voltage = get_valid_number("mppt3_voltage")
+            current = get_valid_number("mppt3_current")
             if voltage is not None and current is not None:
                 return round(voltage * current, 1)
                 
         elif key == "mppt4_power":
-            voltage = data.get("mppt4_voltage")
-            current = data.get("mppt4_current")
+            voltage = get_valid_number("mppt4_voltage")
+            current = get_valid_number("mppt4_current")
             if voltage is not None and current is not None:
                 return round(voltage * current, 1)
                 
@@ -549,8 +606,8 @@ class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntit
             # Sum all MPPT powers
             total = 0.0
             for i in range(1, 5):
-                voltage = data.get(f"mppt{i}_voltage")
-                current = data.get(f"mppt{i}_current")
+                voltage = get_valid_number(f"mppt{i}_voltage")
+                current = get_valid_number(f"mppt{i}_current")
                 if voltage is not None and current is not None:
                     total += voltage * current
             return round(total, 1) if total > 0 else 0.0
@@ -560,7 +617,7 @@ class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntit
             total = 0.0
             has_data = False
             for phase in ["a", "b", "c"]:
-                power = data.get(f"meter_power_phase_{phase}")
+                power = get_valid_number(f"meter_power_phase_{phase}")
                 if power is not None:
                     total += power
                     has_data = True
@@ -571,10 +628,20 @@ class SungrowSensor(CoordinatorEntity[SungrowDataUpdateCoordinator], SensorEntit
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
+        # Entity is available if coordinator is working and we have any data
+        # (including cached data)
+        if not super().available:
+            return False
+            
+        if self.coordinator.data is None:
+            return False
+        
         if self.entity_description.calculated:
-            return super().available and self.coordinator.data is not None
-        return (
-            super().available
-            and self.coordinator.data is not None
-            and self.entity_description.data_key in self.coordinator.data
-        )
+            return True
+            
+        # For non-calculated sensors, check if we have the key
+        # or if we have a cached value
+        has_current_data = self.entity_description.data_key in self.coordinator.data
+        has_cached_value = hasattr(self, '_last_valid_value')
+        
+        return has_current_data or has_cached_value

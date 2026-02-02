@@ -10,6 +10,7 @@ import logging
 import socket
 import ssl
 import struct
+import time
 from typing import Any
 
 from ..const import MODBUS_REGISTERS, MODBUS_HOLDING_REGISTERS, RUNNING_STATES
@@ -19,6 +20,42 @@ _LOGGER = logging.getLogger(__name__)
 # Modbus Function Codes
 FC_READ_HOLDING_REGISTERS = 0x03
 FC_READ_INPUT_REGISTERS = 0x04
+
+# Validation limits for sensor values
+VALUE_LIMITS: dict[str, tuple[float, float]] = {
+    # Temperature limits (in °C)
+    "inverter_temp": (-40, 100),
+    # Voltage limits (in V)
+    "mppt1_voltage": (0, 1500),
+    "mppt2_voltage": (0, 1500),
+    "mppt3_voltage": (0, 1500),
+    "mppt4_voltage": (0, 1500),
+    "grid_voltage_a": (0, 500),
+    "grid_voltage_b": (0, 500),
+    "grid_voltage_c": (0, 500),
+    # Current limits (in A)
+    "mppt1_current": (0, 50),
+    "mppt2_current": (0, 50),
+    "mppt3_current": (0, 50),
+    "mppt4_current": (0, 50),
+    "battery_current": (-200, 200),
+    # Power limits (in W)
+    "total_dc_power": (0, 100000),
+    "battery_power": (-50000, 50000),
+    "meter_power_phase_a": (-50000, 50000),
+    "meter_power_phase_b": (-50000, 50000),
+    "meter_power_phase_c": (-50000, 50000),
+    # Frequency limits (in Hz)
+    "grid_frequency": (45, 65),
+    "grid_frequency_high_precision": (45, 65),
+    # Power factor
+    "power_factor": (-1.1, 1.1),
+    # Energy limits (in kWh)
+    "daily_pv_energy": (0, 500),
+    "total_pv_energy": (0, 10000000),
+    # Nominal power (in kW)
+    "nominal_power": (0, 500),
+}
 
 
 class SungrowModbusClient:
@@ -40,6 +77,12 @@ class SungrowModbusClient:
         self._lock = asyncio.Lock()
         self._transaction_id = 0
         self._timeout = 10
+        self._retry_count = 3
+        self._retry_delay = 1.0
+        self._last_valid_data: dict[str, Any] = {}
+        self._last_successful_read: float = 0
+        self._consecutive_errors = 0
+        self._max_consecutive_errors = 5
 
     def _get_next_transaction_id(self) -> int:
         """Get next transaction ID (wraps at 65535)."""
@@ -331,18 +374,98 @@ class SungrowModbusClient:
             _LOGGER.error("Error parsing register data: %s", err)
             return None
 
+    def _validate_value(self, key: str, value: float | int | str | None) -> bool:
+        """Validate if a value is within expected limits."""
+        if value is None:
+            return False
+        
+        if isinstance(value, str):
+            # String values are valid if not empty
+            return len(value.strip()) > 0
+        
+        if key in VALUE_LIMITS:
+            min_val, max_val = VALUE_LIMITS[key]
+            if not (min_val <= value <= max_val):
+                _LOGGER.warning(
+                    "Value out of range for %s: %s (expected %s to %s)",
+                    key,
+                    value,
+                    min_val,
+                    max_val,
+                )
+                return False
+        
+        # Check for common invalid values (0xFFFF often indicates error)
+        if isinstance(value, (int, float)):
+            # Very large numbers often indicate read errors
+            if abs(value) > 1e9:
+                _LOGGER.warning(
+                    "Suspiciously large value for %s: %s",
+                    key,
+                    value,
+                )
+                return False
+        
+        return True
+
+    async def _read_register_with_retry(
+        self,
+        key: str,
+        reg_config: dict,
+        is_holding: bool = False,
+    ) -> tuple[str, Any]:
+        """Read a single register with retry logic."""
+        read_func = self.read_holding_register if is_holding else self.read_input_register
+        
+        for attempt in range(self._retry_count):
+            try:
+                value = await read_func(
+                    doc_address=reg_config["address"],
+                    count=reg_config["count"],
+                    scale=reg_config["scale"],
+                    signed=reg_config.get("signed", False),
+                    data_type=reg_config.get("type", "u16"),
+                )
+                
+                # Validate the value
+                if value is not None and self._validate_value(key, value):
+                    return key, value
+                
+                # If invalid, try again after a short delay
+                if attempt < self._retry_count - 1:
+                    await asyncio.sleep(self._retry_delay * (attempt + 1))
+                    
+            except Exception as err:
+                _LOGGER.debug(
+                    "Attempt %d failed for %s: %s",
+                    attempt + 1,
+                    key,
+                    err,
+                )
+                if attempt < self._retry_count - 1:
+                    await asyncio.sleep(self._retry_delay * (attempt + 1))
+        
+        # All retries failed, return cached value if available
+        if key in self._last_valid_data:
+            _LOGGER.debug(
+                "Using cached value for %s: %s",
+                key,
+                self._last_valid_data[key],
+            )
+            return key, self._last_valid_data[key]
+        
+        return key, None
+
     async def read_all_data(self) -> dict[str, Any]:
         """Read all configured registers and return data dictionary."""
         data: dict[str, Any] = {}
+        errors = 0
+        total_reads = 0
 
+        # Read input registers
         for key, reg_config in MODBUS_REGISTERS.items():
-            value = await self.read_input_register(
-                doc_address=reg_config["address"],
-                count=reg_config["count"],
-                scale=reg_config["scale"],
-                signed=reg_config.get("signed", False),
-                data_type=reg_config.get("type", "u16"),
-            )
+            total_reads += 1
+            result_key, value = await self._read_register_with_retry(key, reg_config, is_holding=False)
 
             if value is not None:
                 # Special handling for running state
@@ -354,19 +477,26 @@ class SungrowModbusClient:
                     data[key] = round(value, 2)
                 else:
                     data[key] = value
+                
+                # Cache valid values
+                self._last_valid_data[key] = data[key]
+            else:
+                errors += 1
+                # Use cached value if available
+                if key in self._last_valid_data:
+                    data[key] = self._last_valid_data[key]
+                    _LOGGER.debug("Using cached value for %s", key)
 
+        # Read holding registers for system clock
         clock_parts = {}
         for key, reg_config in MODBUS_HOLDING_REGISTERS.items():
-            value = await self.read_holding_register(
-                doc_address=reg_config["address"],
-                count=reg_config["count"],
-                scale=reg_config["scale"],
-                signed=reg_config.get("signed", False),
-                data_type=reg_config.get("type", "u16"),
-            )
+            total_reads += 1
+            result_key, value = await self._read_register_with_retry(key, reg_config, is_holding=True)
             
             if value is not None:
                 clock_parts[key] = int(value)
+            else:
+                errors += 1
 
         if all(k in clock_parts for k in [
             "system_clock_year", "system_clock_month", "system_clock_day",
@@ -380,6 +510,30 @@ class SungrowModbusClient:
                 f"{clock_parts['system_clock_minute']:02d}:"
                 f"{clock_parts['system_clock_second']:02d}"
             )
+
+        # Track error rate
+        if errors > 0:
+            self._consecutive_errors += 1
+            error_rate = errors / total_reads * 100
+            _LOGGER.warning(
+                "Read completed with %d/%d errors (%.1f%%), consecutive error cycles: %d",
+                errors,
+                total_reads,
+                error_rate,
+                self._consecutive_errors,
+            )
+            
+            # Force reconnect if too many consecutive errors
+            if self._consecutive_errors >= self._max_consecutive_errors:
+                _LOGGER.warning(
+                    "Too many consecutive error cycles (%d), forcing reconnect",
+                    self._consecutive_errors,
+                )
+                await self.disconnect()
+                self._consecutive_errors = 0
+        else:
+            self._consecutive_errors = 0
+            self._last_successful_read = time.time()
 
         _LOGGER.debug("Read Modbus data: %s", data)
         return data
