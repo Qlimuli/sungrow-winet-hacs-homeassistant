@@ -21,40 +21,42 @@ _LOGGER = logging.getLogger(__name__)
 FC_READ_HOLDING_REGISTERS = 0x03
 FC_READ_INPUT_REGISTERS = 0x04
 
-# Validation limits for sensor values
+# Validation limits for sensor values - only reject truly impossible values
+# Values of 0 are generally allowed (inverter might be off/idle)
+# Use very generous limits to avoid false positives
 VALUE_LIMITS: dict[str, tuple[float, float]] = {
-    # Temperature limits (in °C)
-    "inverter_temp": (-40, 100),
-    # Voltage limits (in V)
-    "mppt1_voltage": (0, 1500),
-    "mppt2_voltage": (0, 1500),
-    "mppt3_voltage": (0, 1500),
-    "mppt4_voltage": (0, 1500),
-    "grid_voltage_a": (0, 500),
-    "grid_voltage_b": (0, 500),
-    "grid_voltage_c": (0, 500),
-    # Current limits (in A)
-    "mppt1_current": (0, 50),
-    "mppt2_current": (0, 50),
-    "mppt3_current": (0, 50),
-    "mppt4_current": (0, 50),
-    "battery_current": (-200, 200),
-    # Power limits (in W)
-    "total_dc_power": (0, 100000),
-    "battery_power": (-50000, 50000),
-    "meter_power_phase_a": (-50000, 50000),
-    "meter_power_phase_b": (-50000, 50000),
-    "meter_power_phase_c": (-50000, 50000),
-    # Frequency limits (in Hz)
-    "grid_frequency": (45, 65),
-    "grid_frequency_high_precision": (45, 65),
-    # Power factor
-    "power_factor": (-1.1, 1.1),
-    # Energy limits (in kWh)
-    "daily_pv_energy": (0, 500),
-    "total_pv_energy": (0, 10000000),
+    # Temperature limits (in °C) - allow wide range
+    "inverter_temp": (-50, 150),
+    # Voltage limits (in V) - 0 is valid when off
+    "mppt1_voltage": (0, 2000),
+    "mppt2_voltage": (0, 2000),
+    "mppt3_voltage": (0, 2000),
+    "mppt4_voltage": (0, 2000),
+    "grid_voltage_a": (0, 1000),
+    "grid_voltage_b": (0, 1000),
+    "grid_voltage_c": (0, 1000),
+    # Current limits (in A) - 0 is valid
+    "mppt1_current": (0, 100),
+    "mppt2_current": (0, 100),
+    "mppt3_current": (0, 100),
+    "mppt4_current": (0, 100),
+    "battery_current": (-500, 500),
+    # Power limits (in W) - 0 is valid
+    "total_dc_power": (0, 500000),
+    "battery_power": (-100000, 100000),
+    "meter_power_phase_a": (-100000, 100000),
+    "meter_power_phase_b": (-100000, 100000),
+    "meter_power_phase_c": (-100000, 100000),
+    # Frequency limits (in Hz) - 0 is valid when not connected to grid
+    "grid_frequency": (0, 70),
+    "grid_frequency_high_precision": (0, 70),
+    # Power factor - can be 0
+    "power_factor": (-1.5, 1.5),
+    # Energy limits (in kWh) - allow very high values for large systems
+    "daily_pv_energy": (0, 10000),
+    "total_pv_energy": (0, 1000000000),  # 1 TWh should cover any system
     # Nominal power (in kW)
-    "nominal_power": (0, 500),
+    "nominal_power": (0, 10000),
 }
 
 
@@ -77,12 +79,12 @@ class SungrowModbusClient:
         self._lock = asyncio.Lock()
         self._transaction_id = 0
         self._timeout = 10
-        self._retry_count = 3
-        self._retry_delay = 1.0
+        self._retry_count = 2  # Reduced retries to speed up reads
+        self._retry_delay = 0.5
         self._last_valid_data: dict[str, Any] = {}
         self._last_successful_read: float = 0
-        self._consecutive_errors = 0
-        self._max_consecutive_errors = 5
+        self._consecutive_total_failures = 0  # Only count complete failures
+        self._max_consecutive_failures = 10  # More tolerant
 
     def _get_next_transaction_id(self) -> int:
         """Get next transaction ID (wraps at 65535)."""
@@ -375,7 +377,11 @@ class SungrowModbusClient:
             return None
 
     def _validate_value(self, key: str, value: float | int | str | None) -> bool:
-        """Validate if a value is within expected limits."""
+        """Validate if a value is within expected limits.
+        
+        This is a soft validation - values outside limits are logged but still accepted
+        unless they are truly impossible (like negative energy or extreme outliers).
+        """
         if value is None:
             return False
         
@@ -383,28 +389,32 @@ class SungrowModbusClient:
             # String values are valid if not empty
             return len(value.strip()) > 0
         
-        if key in VALUE_LIMITS:
-            min_val, max_val = VALUE_LIMITS[key]
-            if not (min_val <= value <= max_val):
-                _LOGGER.warning(
-                    "Value out of range for %s: %s (expected %s to %s)",
-                    key,
-                    value,
-                    min_val,
-                    max_val,
-                )
-                return False
-        
-        # Check for common invalid values (0xFFFF often indicates error)
         if isinstance(value, (int, float)):
-            # Very large numbers often indicate read errors
-            if abs(value) > 1e9:
-                _LOGGER.warning(
-                    "Suspiciously large value for %s: %s",
+            # Only reject truly impossible values
+            # 0xFFFF (65535) or 0xFFFFFFFF often indicate read errors
+            if value == 65535 or value == 4294967295:
+                _LOGGER.debug(
+                    "Rejecting likely error value for %s: %s (0xFFFF pattern)",
                     key,
                     value,
                 )
                 return False
+            
+            # Check against limits but only log, don't reject unless extreme
+            if key in VALUE_LIMITS:
+                min_val, max_val = VALUE_LIMITS[key]
+                if not (min_val <= value <= max_val):
+                    # Log as debug, not warning - these might be valid edge cases
+                    _LOGGER.debug(
+                        "Value outside expected range for %s: %s (expected %s to %s)",
+                        key,
+                        value,
+                        min_val,
+                        max_val,
+                    )
+                    # Only reject if extremely out of range (10x the limit)
+                    if value < min_val * 10 - abs(max_val) * 10 or value > max_val * 10:
+                        return False
         
         return True
 
@@ -511,28 +521,42 @@ class SungrowModbusClient:
                 f"{clock_parts['system_clock_second']:02d}"
             )
 
-        # Track error rate
-        if errors > 0:
-            self._consecutive_errors += 1
-            error_rate = errors / total_reads * 100
+        # Track error rate - only log if significant portion of reads failed
+        error_rate = errors / total_reads * 100 if total_reads > 0 else 0
+        
+        if error_rate > 50:
+            # More than half of reads failed - this is a real problem
+            self._consecutive_total_failures += 1
             _LOGGER.warning(
-                "Read completed with %d/%d errors (%.1f%%), consecutive error cycles: %d",
+                "High error rate: %d/%d reads failed (%.1f%%), consecutive failures: %d",
                 errors,
                 total_reads,
                 error_rate,
-                self._consecutive_errors,
+                self._consecutive_total_failures,
             )
             
-            # Force reconnect if too many consecutive errors
-            if self._consecutive_errors >= self._max_consecutive_errors:
+            # Force reconnect only if most reads are failing consistently
+            if self._consecutive_total_failures >= self._max_consecutive_failures:
                 _LOGGER.warning(
-                    "Too many consecutive error cycles (%d), forcing reconnect",
-                    self._consecutive_errors,
+                    "Too many consecutive high-error cycles (%d), forcing reconnect",
+                    self._consecutive_total_failures,
                 )
                 await self.disconnect()
-                self._consecutive_errors = 0
+                self._consecutive_total_failures = 0
+        elif error_rate > 0:
+            # Some errors but not critical - just log at debug level
+            _LOGGER.debug(
+                "Read completed with %d/%d errors (%.1f%%)",
+                errors,
+                total_reads,
+                error_rate,
+            )
+            # Reset failure counter if we're getting mostly good reads
+            if error_rate < 25:
+                self._consecutive_total_failures = 0
         else:
-            self._consecutive_errors = 0
+            # All reads successful
+            self._consecutive_total_failures = 0
             self._last_successful_read = time.time()
 
         _LOGGER.debug("Read Modbus data: %s", data)
